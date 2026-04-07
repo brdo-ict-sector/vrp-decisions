@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ШІ-огляд рішень ВРП</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:    #1a56db;
+      --blue-lt: #e8f0fe;
+      --navy:    #0f2557;
+      --gold:    #d4a017;
+      --bg:      #f4f6fb;
+      --surface: #ffffff;
+      --border:  #dce3f0;
+      --text:    #1e2a45;
+      --muted:   #6b7a99;
+      --radius:  10px;
+      --shadow:  0 2px 12px rgba(15,37,87,.08);
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ───────────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+      color: #fff;
+      padding: 2rem 1.5rem 1.75rem;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(15,37,87,.25);
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 20px;
+      padding: .25rem .85rem;
+      font-size: .78rem;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      margin-bottom: .9rem;
+    }
+
+    .header-badge svg { width: 14px; height: 14px; opacity: .9; }
+
+    h1 {
+      font-size: clamp(1.3rem, 3vw, 1.9rem);
+      font-weight: 700;
+      letter-spacing: -.01em;
+      line-height: 1.25;
+      max-width: 680px;
+      margin: 0 auto .5rem;
+    }
+
+    .header-sub {
+      font-size: .9rem;
+      opacity: .75;
+    }
+
+    /* ── Controls ─────────────────────────────────────────────── */
+    .controls {
+      max-width: 1200px;
+      margin: 1.5rem auto .75rem;
+      padding: 0 1rem;
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .search-wrap svg {
+      position: absolute;
+      left: .85rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    #searchInput {
+      width: 100%;
+      padding: .6rem .9rem .6rem 2.4rem;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      font-size: .9rem;
+      background: var(--surface);
+      color: var(--text);
+      transition: border-color .15s;
+      outline: none;
+    }
+
+    #searchInput:focus { border-color: var(--blue); }
+
+    .count-badge {
+      font-size: .82rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    /* ── Table wrapper ────────────────────────────────────────── */
+    .table-wrap {
+      max-width: 1200px;
+      margin: 0 auto 3rem;
+      padding: 0 1rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: var(--navy);
+      color: #fff;
+    }
+
+    thead th {
+      padding: .85rem 1rem;
+      font-size: .78rem;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    /* column widths */
+    col.col-file    { width: 12%; }
+    col.col-essence { width: 22%; }
+    col.col-facts   { width: 33%; }
+    col.col-concl   { width: 33%; }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--blue-lt); }
+
+    td {
+      padding: .9rem 1rem;
+      vertical-align: top;
+      font-size: .875rem;
+      line-height: 1.55;
+    }
+
+    .cell-file {
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: .8rem;
+      color: var(--blue);
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    .cell-essence { color: var(--text); }
+
+    .cell-facts { color: #3a4a6b; }
+
+    .cell-concl ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .cell-concl li {
+      display: flex;
+      gap: .45rem;
+      margin-bottom: .35rem;
+      color: #3a4a6b;
+    }
+
+    .cell-concl li::before {
+      content: '—';
+      color: var(--gold);
+      flex-shrink: 0;
+      font-weight: 700;
+    }
+
+    /* ── Empty / loading states ───────────────────────────────── */
+    #loadingRow td, #emptyRow td {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 24px; height: 24px;
+      border: 3px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin-bottom: .75rem;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Footer ───────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 1.25rem 1rem 2rem;
+      font-size: .78rem;
+      color: var(--muted);
+    }
+
+    /* ── Responsive ───────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .table-wrap { overflow-x: auto; }
+      table { min-width: 700px; }
+      col.col-file { width: 15%; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-badge">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+    </svg>
+    Штучний інтелект · Аналіз рішень
+  </div>
+  <h1>ШІ-огляд рішень дисциплінарних палат<br>Вищої ради правосуддя</h1>
+  <p class="header-sub">Автоматизована аналітика на основі Claude AI</p>
+</header>
+
+<div class="controls">
+  <div class="search-wrap">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <input type="search" id="searchInput" placeholder="Пошук за номером рішення, суттю, фабулою або висновками…" />
+  </div>
+  <span class="count-badge" id="countBadge"></span>
+</div>
+
+<div class="table-wrap">
+  <div class="card">
+    <table>
+      <colgroup>
+        <col class="col-file" />
+        <col class="col-essence" />
+        <col class="col-facts" />
+        <col class="col-concl" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Текст рішення</th>
+          <th>Суть рішення</th>
+          <th>Фабула</th>
+          <th>Ключові висновки</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr id="loadingRow">
+          <td colspan="4">
+            <div class="spinner"></div><br>Завантаження даних…
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<footer>
+  Вища рада правосуддя України · ШІ-аналітика на базі Claude (Anthropic)
+</footer>
+
+<script>
+  let allDecisions = [];
+
+  function conclusionsToList(text) {
+    if (!text) return '';
+    // Split on lines starting with – or - or bullet
+    const lines = text.split('\n')
+      .map(l => l.replace(/^[\s–\-•]+/, '').trim())
+      .filter(Boolean);
+    if (lines.length === 0) return `<li>${text}</li>`;
+    return lines.map(l => `<li>${escHtml(l)}</li>`).join('');
+  }
+
+  function escHtml(str) {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function renderRows(decisions) {
+    const tbody = document.getElementById('tableBody');
+    if (decisions.length === 0) {
+      tbody.innerHTML = '<tr id="emptyRow"><td colspan="4">Рішень не знайдено</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = decisions.map(d => `
+      <tr>
+        <td class="cell-file">${escHtml(d.filename || '')}</td>
+        <td class="cell-essence">${escHtml(d.decision_essence || '')}</td>
+        <td class="cell-facts">${escHtml(d.facts || '')}</td>
+        <td class="cell-concl"><ul>${conclusionsToList(d.key_conclusions || '')}</ul></td>
+      </tr>
+    `).join('');
+  }
+
+  function updateCount(shown, total) {
+    const el = document.getElementById('countBadge');
+    el.textContent = shown === total
+      ? `${total} рішень`
+      : `Показано ${shown} з ${total}`;
+  }
+
+  function applyFilter() {
+    const q = document.getElementById('searchInput').value.toLowerCase().trim();
+    if (!q) {
+      renderRows(allDecisions);
+      updateCount(allDecisions.length, allDecisions.length);
+      return;
+    }
+    const filtered = allDecisions.filter(d =>
+      (d.filename || '').toLowerCase().includes(q) ||
+      (d.decision_essence || '').toLowerCase().includes(q) ||
+      (d.facts || '').toLowerCase().includes(q) ||
+      (d.key_conclusions || '').toLowerCase().includes(q)
+    );
+    renderRows(filtered);
+    updateCount(filtered.length, allDecisions.length);
+  }
+
+  document.getElementById('searchInput').addEventListener('input', applyFilter);
+
+  fetch('decisions.json')
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(data => {
+      allDecisions = data;
+      renderRows(allDecisions);
+      updateCount(allDecisions.length, allDecisions.length);
+    })
+    .catch(err => {
+      document.getElementById('tableBody').innerHTML =
+        `<tr><td colspan="4" style="text-align:center;padding:2rem;color:#c0392b;">
+          Помилка завантаження даних: ${escHtml(err.message)}<br>
+          <small>Переконайтесь, що файл decisions.json знаходиться в тій самій директорії.</small>
+        </td></tr>`;
+    });
+</script>
+
+</body>
+</html>
