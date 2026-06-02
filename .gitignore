@@ -1,0 +1,14 @@
+# Build inputs / large data — NOT served by the site, kept local only
+data/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Local Claude Code config
+.claude/
+
+# OS / editor
+.DS_Store
