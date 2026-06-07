@@ -13,14 +13,11 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from extraction_schema import STRUCTURE_KEYS
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "decisions.db"
 SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else BASE_DIR / "data" / "round2" / "manual_extractions.json"
-
-STRUCTURE_KEYS = (
-    "judge_name", "court", "decision_num", "chamber",
-    "qualification", "conduct", "sanction", "art106_grounds", "summary",
-)
 
 
 def init_db(conn: sqlite3.Connection) -> None:

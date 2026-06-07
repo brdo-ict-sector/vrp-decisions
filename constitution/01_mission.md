@@ -71,10 +71,13 @@ fixed schema; an expert then verifies and corrects it before it becomes authorit
 ## Key Features
 
 ### Structured Extraction (per decision)
+- Decision metadata: date, disciplinary chamber (ДП), decision number, and the official
+  short title (short_name)
 - Judge's full name (ПІП) under review
 - Court where the judge works
 - Interactive link to the source decision
-- Qualification of the act under Art. 106 — at the complaint, ДП decision, and ВРП review
+- Qualification of the act under Art. 106 — at the complaint, ДП decision, and ВРП review,
+  drawn from a controlled vocabulary (a fixed enum of Art. 106 grounds) for consistent filtering
 - Summary of the судді's assessed conduct — at the complaint, ДП decision, and ВРП review
 - Sanction (стягнення) — at the ДП decision and ВРП review
 

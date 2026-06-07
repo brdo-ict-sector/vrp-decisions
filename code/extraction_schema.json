@@ -1,0 +1,272 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "judge_name": {
+      "type": "string"
+    },
+    "court": {
+      "type": "string"
+    },
+    "decision_num": {
+      "type": "string"
+    },
+    "chamber": {
+      "type": "string",
+      "enum": [
+        "Перша",
+        "Друга",
+        "Третя"
+      ]
+    },
+    "date": {
+      "type": "string"
+    },
+    "short_name": {
+      "type": "string"
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "complaint": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "grounds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "106-1а незаконна відмова в доступі до правосуддя / порушення процесуального права",
+                      "106-1б незазначення мотивів щодо аргументів сторін",
+                      "106-1в порушення гласності і відкритості процесу",
+                      "106-1д порушення правил відведення (самовідведення)",
+                      "106-2 безпідставне затягування розгляду справи",
+                      "106-3 поведінка, що порочить звання судді",
+                      "106-4 грубе порушення закону / прав людини"
+                    ]
+                  }
+                },
+                "note": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "grounds",
+                "note"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dp": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "grounds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "106-1а незаконна відмова в доступі до правосуддя / порушення процесуального права",
+                      "106-1б незазначення мотивів щодо аргументів сторін",
+                      "106-1в порушення гласності і відкритості процесу",
+                      "106-1д порушення правил відведення (самовідведення)",
+                      "106-2 безпідставне затягування розгляду справи",
+                      "106-3 поведінка, що порочить звання судді",
+                      "106-4 грубе порушення закону / прав людини"
+                    ]
+                  }
+                },
+                "note": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "grounds",
+                "note"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vrp": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "grounds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "106-1а незаконна відмова в доступі до правосуддя / порушення процесуального права",
+                      "106-1б незазначення мотивів щодо аргументів сторін",
+                      "106-1в порушення гласності і відкритості процесу",
+                      "106-1д порушення правил відведення (самовідведення)",
+                      "106-2 безпідставне затягування розгляду справи",
+                      "106-3 поведінка, що порочить звання судді",
+                      "106-4 грубе порушення закону / прав людини"
+                    ]
+                  }
+                },
+                "note": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "grounds",
+                "note"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "complaint",
+        "dp",
+        "vrp"
+      ]
+    },
+    "conduct": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "complaint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vrp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "complaint",
+        "dp",
+        "vrp"
+      ]
+    },
+    "sanction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "vrp": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "dp",
+        "vrp"
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "essence": {
+          "type": "string"
+        },
+        "facts": {
+          "type": "string"
+        },
+        "conclusions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "essence",
+        "facts",
+        "conclusions"
+      ]
+    }
+  },
+  "required": [
+    "judge_name",
+    "court",
+    "decision_num",
+    "chamber",
+    "date",
+    "short_name",
+    "qualification",
+    "conduct",
+    "sanction",
+    "summary"
+  ]
+}

@@ -2,12 +2,17 @@
 Extract the structured Art. 106 schema + summaries from HCJ disciplinary-chamber
 decisions using the Claude API. Results are stored in SQLite (data/decisions.db).
 
+Extraction is schema-enforced via structured outputs: the request sets
+`output_config.format` to DECISION_SCHEMA (see extraction_schema.py), so the model's
+response is guaranteed to be valid JSON conforming to the schema — and the enum on
+кваліфікація діяння guarantees grounds come only from the fixed corpus enum. Structured
+outputs are compatible with adaptive thinking (unlike forcing a specific tool_choice).
+
 Per decision the model returns:
-  - judge_name (ПІП), court, decision_num
-  - qualification of the act under Art. 106 at the complaint / ДП / ВРП stages
-  - summary of the judge's assessed conduct at the complaint / ДП / ВРП stages
-  - sanction (стягнення) at the ДП / ВРП stages
-  - summaries: essence (суть), facts (фабула), key conclusions (ключові висновки)
+  - judge_name (ПІП), court, decision_num, chamber, date, short_name
+  - qualification per stage (скарга / ДП / ВРП): a list of enum grounds + a note
+  - conduct (summary) per stage; sanction (стягнення) at ДП / ВРП
+  - summary: essence (суть), facts (фабула), conclusions (ключові висновки)
 
 AI drafts; an expert verifies. Re-runs are idempotent (skips done files).
 
@@ -24,59 +29,40 @@ from pathlib import Path
 
 import anthropic
 
+from extraction_schema import ART106_GROUNDS, DECISION_SCHEMA, STRUCTURE_KEYS
+
 # ── Config ──────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
 MARKDOWN_DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else BASE_DIR / "data" / "round2" / "md"
 DB_PATH = BASE_DIR / "data" / "decisions.db"
 
 MODEL = "claude-opus-4-8"
-MAX_TOKENS = 4096
+MAX_TOKENS = 8192
 MAX_CHARS = 160_000  # truncate very long decisions to stay within context
 
-SYSTEM_PROMPT = """Ти — юридичний аналітик, який спеціалізується на дисциплінарному провадженні щодо суддів України.
-Аналізуй рішення дисциплінарних палат Вищої ради правосуддя (ВРП) та готуй структуровані огляди.
+_GROUNDS_LIST = "\n".join(f"  - {g}" for g in ART106_GROUNDS)
+
+SYSTEM_PROMPT = f"""Ти — юридичний аналітик, який спеціалізується на дисциплінарному провадженні щодо суддів України.
+Аналізуй рішення дисциплінарних палат Вищої ради правосуддя (ВРП) і готуй структуровані огляди.
 Відповідай виключно українською мовою. Будь точним, лаконічним та юридично коректним.
-Кваліфікацію діяння завжди прив'язуй до конкретних пунктів/підпунктів частини першої статті 106
-Закону України «Про судоустрій і статус суддів».
-Якщо певної інформації немає в тексті (наприклад, не було перегляду рішенням ВРП), став значення null.
-Повертай ВИКЛЮЧНО валідний JSON без додаткового тексту, markdown-огорожі чи коментарів."""
 
-USER_PROMPT_TEMPLATE = """Проаналізуй рішення дисциплінарної палати ВРП і поверни JSON такої структури:
+Кваліфікацію діяння (поле qualification) фіксуй ОКРЕМО для кожної стадії:
+  - complaint — як діяння кваліфіковано у дисциплінарній скарзі;
+  - dp — як його кваліфікувала дисциплінарна палата у цьому рішенні;
+  - vrp — як його кваліфікувала ВРП, якщо був перегляд, інакше null.
+Для кожної стадії "grounds" — це перелік підстав за частиною першою статті 106 ВИКЛЮЧНО з такого фіксованого набору:
+{_GROUNDS_LIST}
+Обирай лише ті значення зі списку, що відповідають тексту. Якщо у скарзі згадано підставу, якої немає в списку,
+не вигадуй значення — стисло опиши її в полі "note". Поле "note" — короткий уточнювальний коментар або null.
 
-{{
-  "judge_name": "ПІП судді, щодо якого відбувається розгляд",
-  "court": "назва суду, де працює суддя",
-  "decision_num": "номер рішення (напр. 983/1дп/15-25) або null",
-  "chamber": "яка дисциплінарна палата (Перша/Друга/Третя) або null",
-  "qualification": {{
-    "complaint": "кваліфікація діяння за ст.106 у скарзі (пункти + короткий опис) або null",
-    "dp": "кваліфікація діяння за ст.106 у рішенні дисциплінарної палати або null",
-    "vrp": "кваліфікація за ст.106 у рішенні ВРП, якщо був перегляд, інакше null"
-  }},
-  "conduct": {{
-    "complaint": "стисле самарі поведінки судді, оціненої скаржником як проступок, або null",
-    "dp": "стисле самарі поведінки судді, оціненої дисциплінарною палатою як проступок, або null",
-    "vrp": "самарі поведінки за рішенням ВРП, якщо був перегляд, інакше null"
-  }},
-  "sanction": {{
-    "dp": "стягнення у рішенні дисциплінарної палати (або 'відмовлено у притягненні' / опис) або null",
-    "vrp": "стягнення у рішенні ВРП, якщо був перегляд, інакше null"
-  }},
-  "art106_grounds": ["перелік застосованих пунктів ст.106, напр. \\"п.3 ч.1\\", \\"пп.б п.1 ч.1\\""],
-  "summary": {{
-    "essence": "Суть рішення: 2–4 речення (хто суддя, яке стягнення/відмова, підстава за законом)",
-    "facts": "Фабула: 4–8 речень про встановлені палатою факти",
-    "conclusions": ["3–5 ключових висновків палати, кожен — одне речення"]
-  }}
-}}
+Поле date — у форматі дд.мм.рррр. Поле short_name — офіційна назва рішення
+(напр. «Про притягнення судді ... до дисциплінарної відповідальності»). Поле chamber — Перша/Друга/Третя.
+Якщо певної інформації немає в тексті (напр., не було перегляду рішенням ВРП), став відповідні значення null."""
+
+USER_PROMPT_TEMPLATE = """Проаналізуй наведене рішення дисциплінарної палати ВРП і поверни структуровані дані за схемою.
 
 ТЕКСТ РІШЕННЯ:
 {decision_text}"""
-
-STRUCTURE_KEYS = (
-    "judge_name", "court", "decision_num", "chamber",
-    "qualification", "conduct", "sanction", "art106_grounds", "summary",
-)
 
 
 def init_db(conn: sqlite3.Connection) -> None:
@@ -98,16 +84,6 @@ def already_processed(conn: sqlite3.Connection, filename: str) -> bool:
     return row is not None
 
 
-def parse_json(text: str) -> dict:
-    """Parse the model's JSON, tolerating accidental markdown fences."""
-    t = text.strip()
-    if t.startswith("```"):
-        t = t.split("```", 2)[1]
-        t = t[4:] if t.lower().startswith("json") else t
-        t = t.strip()
-    return json.loads(t)
-
-
 def extract_file(client: anthropic.Anthropic, md_path: Path) -> dict:
     decision_text = md_path.read_text(encoding="utf-8")
     if len(decision_text) > MAX_CHARS:
@@ -116,15 +92,20 @@ def extract_file(client: anthropic.Anthropic, md_path: Path) -> dict:
     message = client.messages.create(
         model=MODEL,
         max_tokens=MAX_TOKENS,
+        thinking={"type": "adaptive"},
         system=SYSTEM_PROMPT,
+        output_config={"format": {"type": "json_schema", "schema": DECISION_SCHEMA}},
         messages=[{"role": "user",
                    "content": USER_PROMPT_TEMPLATE.format(decision_text=decision_text)}],
     )
-    data = parse_json(message.content[0].text)
-    # Ensure all top-level keys exist for a stable schema.
-    for k in STRUCTURE_KEYS:
-        data.setdefault(k, None)
-    return data
+
+    # output_config.format guarantees the response carries a text block of valid JSON.
+    text = next((b.text for b in message.content if b.type == "text"), None)
+    if text is None:
+        raise RuntimeError(f"no JSON in response (stop_reason={message.stop_reason})")
+    data = json.loads(text)
+    # Stable key set for downstream storage.
+    return {k: data.get(k) for k in STRUCTURE_KEYS}
 
 
 def main():

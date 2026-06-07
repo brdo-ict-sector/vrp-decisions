@@ -39,12 +39,25 @@ locally, and only a flat JSON dataset and a single HTML page are published.
 
 ### AI extraction & summarization
 - **Anthropic Claude API** via the official `anthropic` Python SDK.
-- **Model:** latest Claude Opus (`claude-opus-4-x`) for legal-grade Ukrainian-language
-  extraction. The system prompt fixes the role (Ukrainian judicial-discipline analyst) and a
-  strict output schema so results parse deterministically.
-- **Prompting:** a fixed schema aligned to Art. 106 of the Law "On the Judiciary and the
-  Status of Judges", capturing qualification, conduct, and sanction at the complaint → ДП →
-  ВРП stages, plus the фабула / суть / ключові висновки summaries.
+- **Model:** latest Claude Opus (`claude-opus-4-8`) for legal-grade Ukrainian-language
+  extraction, with adaptive thinking. The system prompt fixes the role (Ukrainian
+  judicial-discipline analyst).
+- **Schema-enforced output.** Extraction is a single, forced **strict tool call**
+  whose `input_schema` is the canonical JSON Schema in `code/extraction_schema.py`
+  (also dumped to `extraction_schema.json`). Strict mode guarantees the result conforms
+  to the schema and parses deterministically — no free-form JSON, no markdown fences.
+- **Fixed schema** aligned to Art. 106 of the Law "On the Judiciary and the Status of
+  Judges". Per decision it captures:
+  - metadata: ПІП of the judge, court, `chamber` (Перша/Друга/Третя), `decision_num`,
+    `date`, and `short_name` (the decision's official title);
+  - **кваліфікація діяння** per stage (скарга → ДП → ВРП) as a list of grounds drawn
+    from a **fixed enum** (`ART106_GROUNDS` — short labels like
+    `"106-2 безпідставне затягування розгляду справи"`, corpus-only) plus a free-text
+    `note` for nuance;
+  - **conduct** summary and **sanction** (стягнення) per stage;
+  - summaries: **суть** (essence), **фабула** (facts), **ключові висновки** (conclusions).
+- **Stopgap loader:** `02b_load_manual_extractions.py` loads hand-drafted records in the
+  same schema when no API key is available; once a key is set, stage 2 regenerates them.
 
 ### Storage
 - **SQLite** (`data/decisions.db`) — the working store of extracted records, keyed by
@@ -77,6 +90,7 @@ constitution/                 # SDD documents (requirements, mission, this file,
 
 - **No server / database service in production.** Nothing to host beyond static files.
 - **No client-side AI or API keys in the browser.** All AI runs offline during the build; the
-  API key lives only in the local environment (`ANTHROPIC_API_KEY`), never in the repo or site.
+  API key lives only in the local environment (`ANTHROPIC_API_KEY`, e.g. a git-ignored `.env`),
+  never in the repo or site.
 - **No heavyweight frontend framework.** The dataset is small and read-only; a single page is
   enough.

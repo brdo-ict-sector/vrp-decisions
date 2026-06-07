@@ -51,25 +51,36 @@ def main():
             "WHERE data IS NOT NULL ORDER BY filename"
         ).fetchall()
 
+    def stage_grounds(qual: dict, stage: str) -> list:
+        s = (qual or {}).get(stage)
+        return (s or {}).get("grounds", []) if isinstance(s, dict) else []
+
     decisions = []
     for r in rows:
         data = json.loads(r["data"])
         filename = r["filename"]
         lead = filename.split("_", 1)[0]
         link = links.get(lead, {})
-        # Date from filename suffix (e.g. 983_12.05.2025 -> 12.05.2025)
-        date = filename.split("_", 1)[1] if "_" in filename else None
+        # Date from the decision, falling back to the filename suffix (983_12.05.2025).
+        date = data.get("date") or (filename.split("_", 1)[1] if "_" in filename else None)
+
+        qual = data.get("qualification") or {}
+        # Flat ground list for the facet filter: the chamber's qualification
+        # (ВРП on review if present, else ДП, else the complaint).
+        grounds = (stage_grounds(qual, "vrp") or stage_grounds(qual, "dp")
+                   or stage_grounds(qual, "complaint"))
 
         decisions.append({
             "filename": filename,
             "date": date,
             "decision_num": data.get("decision_num") or link.get("decision_num"),
+            "short_name": data.get("short_name"),
             "url": link.get("url"),
             "judge_name": data.get("judge_name"),
             "court": data.get("court"),
             "chamber": data.get("chamber"),
-            "art106_grounds": data.get("art106_grounds") or [],
-            "qualification": data.get("qualification") or {},
+            "art106_grounds": grounds,
+            "qualification": qual,
             "conduct": data.get("conduct") or {},
             "sanction": data.get("sanction") or {},
             "summary": data.get("summary") or {},

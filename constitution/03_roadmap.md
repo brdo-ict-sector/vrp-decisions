@@ -26,15 +26,18 @@ practice becomes filterable and comparable.
 
 - [x] Ingest legacy formats: `.doc` and `.rtf` via headless LibreOffice → `.docx`.
 - [x] Join the decision → public-URL mapping (web-links spreadsheet) for interactive source links.
-- [ ] Extract the structured Art. 106 schema per decision:
-  - ПІП of the judge under review; court.
-  - **Qualification** of the act under Art. 106 — at the complaint, ДП decision, and ВРП review.
+- [x] Define a strict JSON Schema for extraction (`code/extraction_schema.py`) and enforce it
+  via a forced strict tool call.
+- [x] Extract the structured Art. 106 schema per decision:
+  - metadata: ПІП of the judge, court, `chamber`, `decision_num`, `date`, `short_name`.
+  - **Qualification** per stage (complaint → ДП → ВРП) as a **fixed enum** of Art. 106 grounds
+    (short labels) plus a free-text note.
   - **Conduct summary** of the judge — at the complaint, ДП decision, and ВРП review.
   - **Sanction (стягнення)** — at the ДП decision and ВРП review.
-- [ ] Keep the AI summaries (фабула / суть / висновки) alongside the structured fields.
-- [ ] Rebuild the site as a per-decision detail view with faceted filtering
+- [x] Keep the AI summaries (суть / фабула / висновки) alongside the structured fields.
+- [x] Rebuild the site as a per-decision detail view with faceted filtering
   (by Art. 106 ground, sanction, court, judge, ДП vs ВРП stage) and a source link on every record.
-- [ ] Scope: the round-2 batch (~32 decisions, `.docx/.doc/.rtf`).
+- [ ] Scope: the round-2 batch (~32 decisions, `.docx/.doc/.rtf`) — run extraction with an API key.
 
 **Exit criteria:** structured fields populated for the round-2 batch; site filters by ground,
 sanction, court, and stage; every record links to its ВРП source.

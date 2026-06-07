@@ -48,7 +48,6 @@
       font-size: clamp(1.25rem, 3vw, 1.8rem); font-weight: 700;
       line-height: 1.25; max-width: 720px; margin: 0 auto .4rem;
     }
-    .header-sub { font-size: .88rem; opacity: .8; }
 
     /* ── Layout ── */
     .wrap { max-width: 1280px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
@@ -110,7 +109,9 @@
     }
     .card-head:hover { background: var(--blue-lt); }
     .card-title { font-size: 1.02rem; font-weight: 700; color: var(--navy); }
+    .card-subtitle { font-size: .9rem; font-weight: 600; color: #3a4a6b; margin-top: .15rem; }
     .card-meta { font-size: .82rem; color: var(--muted); margin-top: .2rem; }
+    .stage-note { font-size: .8rem; color: var(--muted); margin-top: .3rem; font-style: italic; }
     .card-essence { font-size: .88rem; color: #3a4a6b; margin-top: .5rem; line-height: 1.5; }
     .chev { color: var(--muted); flex-shrink: 0; transition: transform .15s; }
     .card.open .chev { transform: rotate(180deg); }
@@ -175,9 +176,8 @@
 <body>
 
 <header>
-  <span class="header-badge">ШІ-чернетка · перевіряється експертом</span>
+  <span class="header-badge">ВРП | BRDO</span>
   <h1>ШІ-огляд практики дисциплінарних палат<br>Вищої ради правосуддя</h1>
-  <div class="header-sub">Структуровані огляди за статтею 106 ЗУ «Про судоустрій і статус суддів»</div>
 </header>
 
 <div class="wrap">
@@ -190,7 +190,7 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input type="search" id="searchInput" placeholder="Текстовий пошук…" />
+        <input type="search" id="searchInput" placeholder="Пошук за прямими збігами…" />
       </div>
 
       <div class="facet">
@@ -225,7 +225,7 @@
   </div>
 </div>
 
-<footer>Вища рада правосуддя — BRDO, 2026 · ШІ готує чернетку, рішення перевіряє фахівець</footer>
+<footer>Вища рада правосуддя — BRDO, 2026</footer>
 
 <script>
   let ALL = [];
@@ -253,6 +253,8 @@
     return !!(q.vrp || s.vrp || c.vrp);
   }
 
+  const chamberLabel = d => d.chamber ? d.chamber + ' ДП' : '';
+
   function fillSelect(sel, values) {
     values.sort((a,b)=>a.localeCompare(b,'uk'));
     for (const v of values) {
@@ -276,6 +278,7 @@
     fillSelect($('filterChamber'), [...chambers]);
   }
 
+  // Free-text per-stage block (conduct, sanction).
   function stageBlock(label, obj, keys) {
     const cols = keys.map(([k, name]) => {
       const v = obj && obj[k];
@@ -283,6 +286,28 @@
         <div class="stage-name">${name}</div>
         <div class="stage-val ${v ? '' : 'empty'}">${v ? esc(v) : '—'}</div>
       </div>`;
+    }).join('');
+    return `<div class="field">
+      <div class="field-label">${esc(label)}</div>
+      <div class="stages">${cols}</div>
+    </div>`;
+  }
+
+  // Кваліфікація per stage: each value is {grounds:[…], note} | null.
+  function qualBlock(label, obj, keys) {
+    const cols = keys.map(([k, name]) => {
+      const v = obj && obj[k];
+      const grounds = (v && v.grounds) || [];
+      const note = v && v.note;
+      let inner;
+      if (grounds.length || note) {
+        const tags = grounds.map(g => `<span class="tag">${esc(g)}</span>`).join('');
+        inner = `<div class="tags" style="margin-top:0">${tags}</div>` +
+          (note ? `<div class="stage-note">${esc(note)}</div>` : '');
+      } else {
+        inner = `<div class="stage-val empty">—</div>`;
+      }
+      return `<div class="stage-col"><div class="stage-name">${name}</div>${inner}</div>`;
     }).join('');
     return `<div class="field">
       <div class="field-label">${esc(label)}</div>
@@ -305,11 +330,21 @@
       ? `<a class="src-link" href="${esc(d.url)}" target="_blank" rel="noopener">↗ Джерело: ${esc(d.decision_num || d.filename)}</a>`
       : `<span class="src-link disabled">Джерело недоступне</span>`;
 
+    const metaParts = [
+      d.date,
+      chamberLabel(d),
+      d.decision_num ? '№ ' + d.decision_num : '',
+      d.court,
+    ].filter(Boolean).map(esc).join(' · ');
+
+    const qStages = [['complaint','Скарга'],['dp','Дисциплінарна палата'],['vrp','Перегляд від ВРП']];
+
     return `<div class="card" data-idx="${idx}">
       <div class="card-head" onclick="toggle(${idx})">
         <div>
-          <div class="card-title">${esc(d.judge_name || d.filename)}</div>
-          <div class="card-meta">${esc(d.court || '')}${d.court && d.date ? ' · ' : ''}${esc(d.date || '')}${d.decision_num ? ' · № ' + esc(d.decision_num) : ''}</div>
+          <div class="card-title">${esc(d.judge_name || d.short_name || d.filename)}</div>
+          ${d.short_name ? `<div class="card-subtitle">${esc(d.short_name)}</div>` : ''}
+          <div class="card-meta">${metaParts}</div>
           <div class="card-essence">${esc((d.summary && d.summary.essence) || '')}</div>
           <div class="tags">${stageTag}${sanctionTag}${grounds}</div>
         </div>
@@ -321,12 +356,16 @@
           <div class="field-val">${esc((d.summary && d.summary.facts) || '')}</div>
         </div>
         <div class="field">
+          <div class="field-label">Суть рішення</div>
+          <div class="field-val">${esc((d.summary && d.summary.essence) || '')}</div>
+        </div>
+        <div class="field">
           <div class="field-label">Ключові висновки</div>
           <div class="field-val">${conclHtml}</div>
         </div>
-        ${stageBlock('Кваліфікація діяння за ст. 106', d.qualification, [['complaint','Скарга'],['dp','Дисц. палата'],['vrp','ВРП (перегляд)']])}
-        ${stageBlock('Поведінка судді (самарі)', d.conduct, [['complaint','Скарга'],['dp','Дисц. палата'],['vrp','ВРП (перегляд)']])}
-        ${stageBlock('Стягнення', d.sanction, [['dp','Дисц. палата'],['vrp','ВРП (перегляд)']])}
+        ${qualBlock('Кваліфікація діяння за ст. 106', d.qualification, qStages)}
+        ${stageBlock('Поведінка судді (самарі)', d.conduct, qStages)}
+        ${stageBlock('Стягнення', d.sanction, [['dp','Дисциплінарна палата'],['vrp','Перегляд від ВРП']])}
         ${link}
       </div>
     </div>`;
