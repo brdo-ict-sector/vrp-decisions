@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ШІ-огляд рішень ВРП</title>
+  <title>ШІ-огляд практики ВРП — дисциплінарні палати</title>
   <style>
-    /* ── Reset & base ─────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
@@ -18,6 +17,8 @@
       --border:  #dce3f0;
       --text:    #1e2a45;
       --muted:   #6b7a99;
+      --green:   #1d8a4e;
+      --red:     #c0392b;
       --radius:  10px;
       --shadow:  0 2px 12px rgba(15,37,87,.08);
     }
@@ -29,342 +30,362 @@
       min-height: 100vh;
     }
 
-    /* ── Header ───────────────────────────────────────────────── */
+    /* ── Header ── */
     header {
       background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
       color: #fff;
-      padding: 2rem 1.5rem 1.75rem;
+      padding: 1.8rem 1.5rem 1.6rem;
       text-align: center;
       box-shadow: 0 4px 20px rgba(15,37,87,.25);
     }
-
     .header-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: .4rem;
-      background: rgba(255,255,255,.12);
-      border: 1px solid rgba(255,255,255,.25);
-      border-radius: 20px;
-      padding: .25rem .85rem;
-      font-size: .78rem;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-      margin-bottom: .9rem;
+      display: inline-flex; align-items: center; gap: .4rem;
+      background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
+      border-radius: 20px; padding: .25rem .85rem; font-size: .72rem;
+      letter-spacing: .05em; text-transform: uppercase; margin-bottom: .8rem;
     }
-
-    .header-badge svg { width: 14px; height: 14px; opacity: .9; }
-
     h1 {
-      font-size: clamp(1.3rem, 3vw, 1.9rem);
-      font-weight: 700;
-      letter-spacing: -.01em;
-      line-height: 1.25;
-      max-width: 680px;
-      margin: 0 auto .5rem;
+      font-size: clamp(1.25rem, 3vw, 1.8rem); font-weight: 700;
+      line-height: 1.25; max-width: 720px; margin: 0 auto .4rem;
     }
+    .header-sub { font-size: .88rem; opacity: .8; }
 
-    .header-sub {
-      font-size: .9rem;
-      opacity: .75;
+    /* ── Layout ── */
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+    .layout { display: grid; grid-template-columns: 260px 1fr; gap: 1.25rem; }
+
+    /* ── Filters sidebar ── */
+    .filters {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 1rem; align-self: start; position: sticky; top: 1rem;
+      max-height: calc(100vh - 2rem); overflow-y: auto;
     }
-
-    /* ── Controls ─────────────────────────────────────────────── */
-    .controls {
-      max-width: 1200px;
-      margin: 1.5rem auto .75rem;
-      padding: 0 1rem;
-      display: flex;
-      gap: .75rem;
-      align-items: center;
-      flex-wrap: wrap;
+    .filters h2 {
+      font-size: .8rem; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); margin-bottom: .75rem;
     }
-
-    .search-wrap {
-      position: relative;
-      flex: 1;
-      min-width: 220px;
-    }
-
+    .search-wrap { position: relative; margin-bottom: 1rem; }
     .search-wrap svg {
-      position: absolute;
-      left: .85rem;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--muted);
-      pointer-events: none;
+      position: absolute; left: .7rem; top: 50%; transform: translateY(-50%);
+      color: var(--muted); pointer-events: none;
     }
-
     #searchInput {
-      width: 100%;
-      padding: .6rem .9rem .6rem 2.4rem;
-      border: 1.5px solid var(--border);
-      border-radius: var(--radius);
-      font-size: .9rem;
-      background: var(--surface);
-      color: var(--text);
-      transition: border-color .15s;
-      outline: none;
+      width: 100%; padding: .55rem .8rem .55rem 2.1rem;
+      border: 1.5px solid var(--border); border-radius: var(--radius);
+      font-size: .88rem; background: var(--surface); color: var(--text); outline: none;
     }
-
     #searchInput:focus { border-color: var(--blue); }
 
-    .count-badge {
-      font-size: .82rem;
-      color: var(--muted);
-      white-space: nowrap;
+    .facet { margin-bottom: 1rem; }
+    .facet-title { font-size: .82rem; font-weight: 600; margin-bottom: .4rem; }
+    .facet select {
+      width: 100%; padding: .45rem .6rem; border: 1.5px solid var(--border);
+      border-radius: 8px; font-size: .85rem; background: var(--surface);
+      color: var(--text); outline: none;
     }
+    .facet select:focus { border-color: var(--blue); }
+    .reset-btn {
+      width: 100%; padding: .5rem; margin-top: .25rem; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--bg); color: var(--muted);
+      font-size: .82rem; cursor: pointer;
+    }
+    .reset-btn:hover { background: var(--blue-lt); color: var(--blue); }
 
-    /* ── Table wrapper ────────────────────────────────────────── */
-    .table-wrap {
-      max-width: 1200px;
-      margin: 0 auto 3rem;
-      padding: 0 1rem;
+    /* ── Results ── */
+    .results-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: .75rem; flex-wrap: wrap; gap: .5rem;
     }
+    .count-badge { font-size: .85rem; color: var(--muted); }
 
     .card {
-      background: var(--surface);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-      border: 1px solid var(--border);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      margin-bottom: 1rem; overflow: hidden;
     }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
+    .card-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 1rem; padding: 1rem 1.1rem; cursor: pointer; background: var(--surface);
     }
+    .card-head:hover { background: var(--blue-lt); }
+    .card-title { font-size: 1.02rem; font-weight: 700; color: var(--navy); }
+    .card-meta { font-size: .82rem; color: var(--muted); margin-top: .2rem; }
+    .card-essence { font-size: .88rem; color: #3a4a6b; margin-top: .5rem; line-height: 1.5; }
+    .chev { color: var(--muted); flex-shrink: 0; transition: transform .15s; }
+    .card.open .chev { transform: rotate(180deg); }
 
-    thead {
-      background: var(--navy);
-      color: #fff;
+    .tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }
+    .tag {
+      font-size: .72rem; padding: .15rem .55rem; border-radius: 12px;
+      background: var(--blue-lt); color: var(--blue); font-weight: 600; white-space: nowrap;
     }
+    .tag.sanction { background: #fdeeee; color: var(--red); }
+    .tag.stage    { background: #eaf6ef; color: var(--green); }
 
-    thead th {
-      padding: .85rem 1rem;
-      font-size: .78rem;
-      font-weight: 600;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      text-align: left;
-      white-space: nowrap;
+    /* ── Card body (expanded) ── */
+    .card-body { display: none; padding: 0 1.1rem 1.1rem; border-top: 1px solid var(--border); }
+    .card.open .card-body { display: block; }
+
+    .field { margin-top: 1rem; }
+    .field-label {
+      font-size: .74rem; text-transform: uppercase; letter-spacing: .05em;
+      color: var(--muted); font-weight: 700; margin-bottom: .3rem;
     }
+    .field-val { font-size: .9rem; line-height: 1.55; color: var(--text); }
+    .field-val ul { padding-left: 1.1rem; }
+    .field-val li { margin-bottom: .25rem; }
 
-    /* column widths */
-    col.col-file    { width: 12%; }
-    col.col-essence { width: 22%; }
-    col.col-facts   { width: 33%; }
-    col.col-concl   { width: 33%; }
-
-    tbody tr {
-      border-bottom: 1px solid var(--border);
-      transition: background .1s;
+    .stages { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .6rem; margin-top: .3rem; }
+    .stage-col {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: .55rem .65rem;
     }
-
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--blue-lt); }
-
-    td {
-      padding: .9rem 1rem;
-      vertical-align: top;
-      font-size: .875rem;
-      line-height: 1.55;
+    .stage-name {
+      font-size: .72rem; font-weight: 700; color: var(--navy);
+      text-transform: uppercase; letter-spacing: .03em; margin-bottom: .25rem;
     }
+    .stage-val { font-size: .84rem; line-height: 1.45; color: #3a4a6b; }
+    .stage-val.empty { color: var(--muted); font-style: italic; }
 
-    .cell-file {
-      font-family: 'Consolas', 'Courier New', monospace;
-      font-size: .8rem;
-      color: var(--blue);
-      font-weight: 600;
-      word-break: break-word;
+    .src-link {
+      display: inline-flex; align-items: center; gap: .35rem; margin-top: .9rem;
+      font-size: .85rem; color: var(--blue); font-weight: 600; text-decoration: none;
     }
+    .src-link:hover { text-decoration: underline; }
+    .src-link.disabled { color: var(--muted); pointer-events: none; font-weight: 500; }
 
-    .cell-essence { color: var(--text); }
-
-    .cell-facts { color: #3a4a6b; }
-
-    .cell-concl ul {
-      list-style: none;
-      padding: 0;
-    }
-
-    .cell-concl li {
-      display: flex;
-      gap: .45rem;
-      margin-bottom: .35rem;
-      color: #3a4a6b;
-    }
-
-    .cell-concl li::before {
-      content: '—';
-      color: var(--gold);
-      flex-shrink: 0;
-      font-weight: 700;
-    }
-
-    /* ── Empty / loading states ───────────────────────────────── */
-    #loadingRow td, #emptyRow td {
-      text-align: center;
-      padding: 3rem 1rem;
-      color: var(--muted);
-      font-size: .9rem;
-    }
-
+    .loading, .empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
     .spinner {
-      display: inline-block;
-      width: 24px; height: 24px;
-      border: 3px solid var(--border);
-      border-top-color: var(--blue);
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      margin-bottom: .75rem;
+      display: inline-block; width: 26px; height: 26px; border: 3px solid var(--border);
+      border-top-color: var(--blue); border-radius: 50%;
+      animation: spin .7s linear infinite; margin-bottom: .75rem;
     }
-
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Footer ───────────────────────────────────────────────── */
-    footer {
-      text-align: center;
-      padding: 1.25rem 1rem 2rem;
-      font-size: .78rem;
-      color: var(--muted);
-    }
+    footer { text-align: center; padding: 1.25rem 1rem 2rem; font-size: .78rem; color: var(--muted); }
 
-    /* ── Responsive ───────────────────────────────────────────── */
-    @media (max-width: 768px) {
-      .table-wrap { overflow-x: auto; }
-      table { min-width: 700px; }
-      col.col-file { width: 15%; }
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .filters { position: static; max-height: none; }
+      .stages { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>ШІ-огляд рішень дисциплінарних палат<br>Вищої ради правосуддя</h1>
+  <span class="header-badge">ШІ-чернетка · перевіряється експертом</span>
+  <h1>ШІ-огляд практики дисциплінарних палат<br>Вищої ради правосуддя</h1>
+  <div class="header-sub">Структуровані огляди за статтею 106 ЗУ «Про судоустрій і статус суддів»</div>
 </header>
 
-<div class="controls">
-  <div class="search-wrap">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-    </svg>
-    <input type="search" id="searchInput" placeholder="Текстовий пошук (знаходить лише прямі збіги)" />
+<div class="wrap">
+  <div class="layout">
+
+    <!-- Filters -->
+    <aside class="filters">
+      <h2>Пошук і фільтри</h2>
+      <div class="search-wrap">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="search" id="searchInput" placeholder="Текстовий пошук…" />
+      </div>
+
+      <div class="facet">
+        <div class="facet-title">Підстава за ст. 106</div>
+        <select id="filterGround"><option value="">Усі підстави</option></select>
+      </div>
+      <div class="facet">
+        <div class="facet-title">Стягнення</div>
+        <select id="filterSanction"><option value="">Усі стягнення</option></select>
+      </div>
+      <div class="facet">
+        <div class="facet-title">Суд</div>
+        <select id="filterCourt"><option value="">Усі суди</option></select>
+      </div>
+      <div class="facet">
+        <div class="facet-title">Палата</div>
+        <select id="filterChamber"><option value="">Усі палати</option></select>
+      </div>
+      <button class="reset-btn" id="resetBtn">Скинути фільтри</button>
+    </aside>
+
+    <!-- Results -->
+    <main>
+      <div class="results-head">
+        <span class="count-badge" id="countBadge"></span>
+      </div>
+      <div id="results">
+        <div class="loading"><div class="spinner"></div><br>Завантаження даних…</div>
+      </div>
+    </main>
+
   </div>
-  <span class="count-badge" id="countBadge"></span>
 </div>
 
-<div class="table-wrap">
-  <div class="card">
-    <table>
-      <colgroup>
-        <col class="col-file" />
-        <col class="col-essence" />
-        <col class="col-facts" />
-        <col class="col-concl" />
-      </colgroup>
-      <thead>
-        <tr>
-          <th>Текст рішення</th>
-          <th>Суть рішення</th>
-          <th>Фабула</th>
-          <th>Ключові висновки</th>
-        </tr>
-      </thead>
-      <tbody id="tableBody">
-        <tr id="loadingRow">
-          <td colspan="4">
-            <div class="spinner"></div><br>Завантаження даних…
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<footer>
-  Вища рада правосуддя - BRDO, 2026
-</footer>
+<footer>Вища рада правосуддя — BRDO, 2026 · ШІ готує чернетку, рішення перевіряє фахівець</footer>
 
 <script>
-  let allDecisions = [];
+  let ALL = [];
 
-  function conclusionsToList(text) {
-    if (!text) return '';
-    // Split on lines starting with – or - or bullet
-    const lines = text.split('\n')
-      .map(l => l.replace(/^[\s–\-•]+/, '').trim())
-      .filter(Boolean);
-    if (lines.length === 0) return `<li>${text}</li>`;
-    return lines.map(l => `<li>${escHtml(l)}</li>`).join('');
+  const $ = id => document.getElementById(id);
+  const esc = s => (s == null ? '' : String(s))
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  const SANCTION_KINDS = [
+    ['Звільнення',            /звільн|подання про звільнення/i],
+    ['Сувора догана',         /сувор\w* доган/i],
+    ['Догана',                /доган/i],
+    ['Попередження',          /попередженн/i],
+    ['Відмовлено у притягненні', /відмов/i],
+  ];
+
+  function sanctionKind(d) {
+    const t = ((d.sanction && (d.sanction.vrp || d.sanction.dp)) || '').toString();
+    for (const [label, re] of SANCTION_KINDS) if (re.test(t)) return label;
+    return t.trim() ? 'Інше' : '—';
   }
 
-  function escHtml(str) {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+  function hasVrp(d) {
+    const q = d.qualification || {}, s = d.sanction || {}, c = d.conduct || {};
+    return !!(q.vrp || s.vrp || c.vrp);
   }
 
-  function renderRows(decisions) {
-    const tbody = document.getElementById('tableBody');
-    if (decisions.length === 0) {
-      tbody.innerHTML = '<tr id="emptyRow"><td colspan="4">Рішень не знайдено</td></tr>';
-      return;
+  function fillSelect(sel, values) {
+    values.sort((a,b)=>a.localeCompare(b,'uk'));
+    for (const v of values) {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = v;
+      sel.appendChild(o);
     }
-
-    tbody.innerHTML = decisions.map(d => `
-      <tr>
-        <td class="cell-file">${escHtml(d.filename || '')}</td>
-        <td class="cell-essence">${escHtml(d.decision_essence || '')}</td>
-        <td class="cell-facts">${escHtml(d.facts || '')}</td>
-        <td class="cell-concl"><ul>${conclusionsToList(d.key_conclusions || '')}</ul></td>
-      </tr>
-    `).join('');
   }
 
-  function updateCount(shown, total) {
-    const el = document.getElementById('countBadge');
-    el.textContent = shown === total
-      ? `${total} рішень`
-      : `Показано ${shown} з ${total}`;
-  }
-
-  function applyFilter() {
-    const q = document.getElementById('searchInput').value.toLowerCase().trim();
-    if (!q) {
-      renderRows(allDecisions);
-      updateCount(allDecisions.length, allDecisions.length);
-      return;
+  function buildFacets() {
+    const grounds = new Set(), courts = new Set(), chambers = new Set(), sanctions = new Set();
+    for (const d of ALL) {
+      (d.art106_grounds || []).forEach(g => g && grounds.add(g.trim()));
+      if (d.court) courts.add(d.court.trim());
+      if (d.chamber) chambers.add(d.chamber.trim());
+      sanctions.add(sanctionKind(d));
     }
-    const filtered = allDecisions.filter(d =>
-      (d.filename || '').toLowerCase().includes(q) ||
-      (d.decision_essence || '').toLowerCase().includes(q) ||
-      (d.facts || '').toLowerCase().includes(q) ||
-      (d.key_conclusions || '').toLowerCase().includes(q)
-    );
-    renderRows(filtered);
-    updateCount(filtered.length, allDecisions.length);
+    fillSelect($('filterGround'), [...grounds]);
+    fillSelect($('filterSanction'), [...sanctions]);
+    fillSelect($('filterCourt'), [...courts]);
+    fillSelect($('filterChamber'), [...chambers]);
   }
 
-  document.getElementById('searchInput').addEventListener('input', applyFilter);
+  function stageBlock(label, obj, keys) {
+    const cols = keys.map(([k, name]) => {
+      const v = obj && obj[k];
+      return `<div class="stage-col">
+        <div class="stage-name">${name}</div>
+        <div class="stage-val ${v ? '' : 'empty'}">${v ? esc(v) : '—'}</div>
+      </div>`;
+    }).join('');
+    return `<div class="field">
+      <div class="field-label">${esc(label)}</div>
+      <div class="stages">${cols}</div>
+    </div>`;
+  }
+
+  function cardHtml(d, idx) {
+    const concl = (d.summary && d.summary.conclusions) || [];
+    const conclHtml = Array.isArray(concl) && concl.length
+      ? `<ul>${concl.map(c => `<li>${esc(c)}</li>`).join('')}</ul>`
+      : esc((d.summary && d.summary.conclusions) || '');
+
+    const grounds = (d.art106_grounds || []).map(g => `<span class="tag">${esc(g)}</span>`).join('');
+    const sk = sanctionKind(d);
+    const sanctionTag = sk !== '—' ? `<span class="tag sanction">${esc(sk)}</span>` : '';
+    const stageTag = hasVrp(d) ? `<span class="tag stage">ДП + ВРП</span>` : `<span class="tag stage">ДП</span>`;
+
+    const link = d.url
+      ? `<a class="src-link" href="${esc(d.url)}" target="_blank" rel="noopener">↗ Джерело: ${esc(d.decision_num || d.filename)}</a>`
+      : `<span class="src-link disabled">Джерело недоступне</span>`;
+
+    return `<div class="card" data-idx="${idx}">
+      <div class="card-head" onclick="toggle(${idx})">
+        <div>
+          <div class="card-title">${esc(d.judge_name || d.filename)}</div>
+          <div class="card-meta">${esc(d.court || '')}${d.court && d.date ? ' · ' : ''}${esc(d.date || '')}${d.decision_num ? ' · № ' + esc(d.decision_num) : ''}</div>
+          <div class="card-essence">${esc((d.summary && d.summary.essence) || '')}</div>
+          <div class="tags">${stageTag}${sanctionTag}${grounds}</div>
+        </div>
+        <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="card-body">
+        <div class="field">
+          <div class="field-label">Фабула</div>
+          <div class="field-val">${esc((d.summary && d.summary.facts) || '')}</div>
+        </div>
+        <div class="field">
+          <div class="field-label">Ключові висновки</div>
+          <div class="field-val">${conclHtml}</div>
+        </div>
+        ${stageBlock('Кваліфікація діяння за ст. 106', d.qualification, [['complaint','Скарга'],['dp','Дисц. палата'],['vrp','ВРП (перегляд)']])}
+        ${stageBlock('Поведінка судді (самарі)', d.conduct, [['complaint','Скарга'],['dp','Дисц. палата'],['vrp','ВРП (перегляд)']])}
+        ${stageBlock('Стягнення', d.sanction, [['dp','Дисц. палата'],['vrp','ВРП (перегляд)']])}
+        ${link}
+      </div>
+    </div>`;
+  }
+
+  window.toggle = function(idx) {
+    const card = document.querySelector(`.card[data-idx="${idx}"]`);
+    if (card) card.classList.toggle('open');
+  };
+
+  function render(list) {
+    const box = $('results');
+    if (!list.length) { box.innerHTML = '<div class="empty">Рішень не знайдено</div>'; return; }
+    box.innerHTML = list.map((d) => cardHtml(d, ALL.indexOf(d))).join('');
+  }
+
+  function applyFilters() {
+    const q = $('searchInput').value.toLowerCase().trim();
+    const g = $('filterGround').value;
+    const s = $('filterSanction').value;
+    const c = $('filterCourt').value;
+    const ch = $('filterChamber').value;
+
+    const filtered = ALL.filter(d => {
+      if (g && !(d.art106_grounds || []).some(x => x && x.trim() === g)) return false;
+      if (s && sanctionKind(d) !== s) return false;
+      if (c && (d.court || '').trim() !== c) return false;
+      if (ch && (d.chamber || '').trim() !== ch) return false;
+      if (q) {
+        const blob = JSON.stringify(d).toLowerCase();
+        if (!blob.includes(q)) return false;
+      }
+      return true;
+    });
+    render(filtered);
+    $('countBadge').textContent = filtered.length === ALL.length
+      ? `${ALL.length} рішень` : `Показано ${filtered.length} з ${ALL.length}`;
+  }
+
+  ['searchInput','filterGround','filterSanction','filterCourt','filterChamber']
+    .forEach(id => $(id).addEventListener('input', applyFilters));
+  $('resetBtn').addEventListener('click', () => {
+    $('searchInput').value = '';
+    ['filterGround','filterSanction','filterCourt','filterChamber'].forEach(id => $(id).value = '');
+    applyFilters();
+  });
 
   fetch('decisions.json')
-    .then(r => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    })
+    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
     .then(data => {
-      allDecisions = data;
-      renderRows(allDecisions);
-      updateCount(allDecisions.length, allDecisions.length);
+      ALL = data;
+      buildFacets();
+      render(ALL);
+      $('countBadge').textContent = `${ALL.length} рішень`;
     })
     .catch(err => {
-      document.getElementById('tableBody').innerHTML =
-        `<tr><td colspan="4" style="text-align:center;padding:2rem;color:#c0392b;">
-          Помилка завантаження даних: ${escHtml(err.message)}<br>
-          <small>Переконайтесь, що файл decisions.json знаходиться в тій самій директорії.</small>
-        </td></tr>`;
+      $('results').innerHTML =
+        `<div class="empty" style="color:#c0392b">Помилка завантаження даних: ${esc(err.message)}<br>
+         <small>Переконайтесь, що файл decisions.json знаходиться поруч із index.html.</small></div>`;
     });
 </script>
 
