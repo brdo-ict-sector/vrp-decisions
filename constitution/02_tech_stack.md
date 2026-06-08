@@ -1,6 +1,6 @@
 # Tech Stack
 
-> Last updated: 2026-06-07
+> Last updated: 2026-06-08
 > Status: Active
 > Source: derived from [00_stakeholder_requirements.md](./00_stakeholder_requirements.md) and [01_mission.md](./01_mission.md)
 
@@ -68,6 +68,9 @@ locally, and only a flat JSON dataset and a single HTML page are published.
 ### Published site (`docs/`, GitHub Pages)
 - **Static HTML/CSS/vanilla JavaScript** — a single `index.html` with no build step and no
   framework. It `fetch`es `decisions.json` and renders, searches, and filters client-side.
+- **Responsive, no framework.** Desktop shows a sticky filters sidebar beside the results; on
+  narrow screens (≤860px) the layout collapses to one column and the filters become a
+  collapsed-by-default panel (toggle to expand), so results are visible immediately on phones.
 - **Hosting:** GitHub Pages serves the `docs/` directory directly.
 
 ## Data layout
