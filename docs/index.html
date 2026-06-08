@@ -6,6 +6,7 @@
   <title>ШІ-огляд практики ВРП — дисциплінарні палати</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { overflow-x: hidden; }
 
     :root {
       --blue:    #1a56db;
@@ -64,6 +65,8 @@
       font-size: .8rem; text-transform: uppercase; letter-spacing: .06em;
       color: var(--muted); margin-bottom: .75rem;
     }
+    /* Mobile-only collapse toggle (hidden on desktop) */
+    .filters-toggle { display: none; }
     .search-wrap { position: relative; margin-bottom: 1rem; }
     .search-wrap svg {
       position: absolute; left: .7rem; top: 50%; transform: translateY(-50%);
@@ -107,6 +110,8 @@
       display: flex; justify-content: space-between; align-items: flex-start;
       gap: 1rem; padding: 1rem 1.1rem; cursor: pointer; background: var(--surface);
     }
+    /* Let the text column shrink instead of being forced wide by long tags (flexbox min-width:auto trap) */
+    .card-head > div { min-width: 0; }
     .card-head:hover { background: var(--blue-lt); }
     .card-title { font-size: 1.02rem; font-weight: 700; color: var(--navy); }
     .card-subtitle { font-size: .9rem; font-weight: 600; color: #3a4a6b; margin-top: .15rem; }
@@ -119,7 +124,8 @@
     .tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }
     .tag {
       font-size: .72rem; padding: .15rem .55rem; border-radius: 12px;
-      background: var(--blue-lt); color: var(--blue); font-weight: 600; white-space: nowrap;
+      background: var(--blue-lt); color: var(--blue); font-weight: 600;
+      max-width: 100%; overflow-wrap: anywhere;
     }
     .tag.sanction { background: #fdeeee; color: var(--red); }
     .tag.stage    { background: #eaf6ef; color: var(--green); }
@@ -168,8 +174,29 @@
 
     @media (max-width: 860px) {
       .layout { grid-template-columns: 1fr; }
-      .filters { position: static; max-height: none; }
+      .filters {
+        position: static; max-height: none; overflow: visible;
+        padding: .35rem; margin-bottom: .25rem;
+      }
+      .filters h2 { display: none; }            /* label lives in the toggle on mobile */
+      .filters-toggle {
+        display: flex; align-items: center; justify-content: space-between;
+        width: 100%; padding: .7rem .85rem; border: none; background: none;
+        font-size: .9rem; font-weight: 700; color: var(--navy);
+        text-transform: uppercase; letter-spacing: .04em; cursor: pointer;
+      }
+      .filters-toggle .chev { transition: transform .2s; }
+      .filters.open .filters-toggle .chev { transform: rotate(180deg); }
+      /* Collapsed by default on mobile so results are visible immediately */
+      .filters-body { display: none; padding: 0 .5rem .5rem; }
+      .filters.open .filters-body { display: block; }
+      /* Pack the facets two-up to cut the panel's height when expanded */
+      .filters-body .facet { margin-bottom: .7rem; }
       .stages { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 860px) and (min-width: 460px) {
+      .facets-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+      .facets-grid .facet { margin-bottom: 0; }
     }
   </style>
 </head>
@@ -185,6 +212,11 @@
 
     <!-- Filters -->
     <aside class="filters">
+      <button class="filters-toggle" id="filtersToggle" aria-expanded="false" aria-controls="filtersBody">
+        <span>Пошук і фільтри</span>
+        <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="filters-body" id="filtersBody">
       <h2>Пошук і фільтри</h2>
       <div class="search-wrap">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -193,6 +225,7 @@
         <input type="search" id="searchInput" placeholder="Пошук за прямими збігами…" />
       </div>
 
+      <div class="facets-grid">
       <div class="facet">
         <div class="facet-title">Підстава за ст. 106</div>
         <select id="filterGround"><option value="">Усі підстави</option></select>
@@ -209,7 +242,9 @@
         <div class="facet-title">Палата</div>
         <select id="filterChamber"><option value="">Усі палати</option></select>
       </div>
+      </div>
       <button class="reset-btn" id="resetBtn">Скинути фільтри</button>
+      </div>
     </aside>
 
     <!-- Results -->
@@ -407,6 +442,12 @@
 
   ['searchInput','filterGround','filterSanction','filterCourt','filterChamber']
     .forEach(id => $(id).addEventListener('input', applyFilters));
+  // Collapsible filters panel (mobile). Button is hidden on desktop via CSS.
+  $('filtersToggle').addEventListener('click', () => {
+    const open = document.querySelector('.filters').classList.toggle('open');
+    $('filtersToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
   $('resetBtn').addEventListener('click', () => {
     $('searchInput').value = '';
     ['filterGround','filterSanction','filterCourt','filterChamber'].forEach(id => $(id).value = '');
