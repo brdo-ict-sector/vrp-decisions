@@ -29,7 +29,12 @@ from copy import deepcopy
 # legal wording lives in the decision text, not in the facet value.
 #
 # The first seven labels are FROZEN — round-2 extractions and docs/decisions.json
-# already carry them verbatim. Never reword an existing label; only append.
+# already carry them verbatim. Never reword them; only append.
+#
+# Outside those seven, a reword is allowed *only together with re-extraction of
+# every act carrying the old label* — a stored value that is no longer an enum
+# member is worse than a bad label, because nothing downstream can validate it.
+# 106-9 and 106-19 were reworded on 2026-07-29 under exactly that rule.
 #
 # The rest were added when ухвали про відкриття entered the corpus: rulings cite a
 # much wider slice of ст. 106 than the decisions did (106-1г alone appears 72
@@ -51,13 +56,28 @@ ART106_GROUNDS = [
     "106-5 розголошення таємниці, що охороняється законом",
     "106-6 неповідомлення про втручання в діяльність судді",
     "106-8 втручання у процес здійснення правосуддя іншими суддями",
-    "106-9 неподання або несвоєчасне подання декларації",
+    "106-9 неподання декларації особи, уповноваженої на виконання функцій держави",
     "106-10 зазначення в декларації завідомо неправдивих відомостей",
     "106-11 використання статусу судді для незаконної вигоди",
     "106-13 ненадання інформації на законну вимогу члена ВРП",
     "106-15 визнання винним у корупційному правопорушенні",
     "106-17 недостовірні відомості в декларації родинних зв’язків",
-    "106-19 порушення правил самовідводу / недостовірне декларування",
+    # ── added 2026-07-29, after the corpus run: the enum covered 19 of the
+    # statute's 25 підстав, so six real grounds had nowhere to go and the model
+    # was writing them into the free-text `note` — invisible to any facet. The
+    # corpus notes show 106-7 and 106-12 occurring outright («не встановила
+    # ознак проступку за пунктом 12 частини першої статті 106…»).
+    "106-7 неповідомлення про конфлікт інтересів",
+    "106-12 недоброчесна поведінка / невідповідність рівня життя",
+    "106-14 непроходження підвищення кваліфікації / кваліфікаційного оцінювання",
+    "106-14-1 непроходження початкової підготовки",
+    "106-16 неподання декларації родинних зв’язків",
+    "106-18 неподання декларації доброчесності",
+    # Reworded in the same pass. The old label read «порушення правил
+    # самовідводу / недостовірне декларування», welding пункт 1д onto пункт 19 —
+    # two unrelated grounds, and 1д already has its own value. Both halves were
+    # in live use, so a facet on it returned a mixed bag.
+    "106-19 недостовірні твердження в декларації доброчесності",
 ]
 
 CHAMBERS = ["Перша", "Друга", "Третя"]

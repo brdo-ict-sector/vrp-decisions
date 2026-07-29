@@ -30,16 +30,40 @@ import json
 import sqlite3
 import sys
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 
-# Priced per million tokens. Only used for the end-of-run summary — the invoice
-# is authoritative, this is the sanity check against it.
+# Priced per million tokens (input, output). Used for the end-of-run summary and
+# for the `--budget` ceiling — the invoice is authoritative, this is what we
+# steer by. Sonnet 5 is at introductory pricing ($2/$10) through 2026-08-31;
+# list is $3/$15, so a run that straddles that date costs 1.5× this estimate.
 PRICES = {
-    "claude-sonnet-5": (3.00, 15.00),
+    "claude-sonnet-5": (2.00, 10.00),
     "claude-opus-5": (5.00, 25.00),
     "claude-haiku-4-5": (1.00, 5.00),
 }
+
+
+def cost_of(totals: dict, model: str) -> float:
+    """Dollar cost of `{"in": n, "out": n}` at list prices for `model` (0 if unpriced)."""
+    price = PRICES.get(model)
+    if not price:
+        return 0.0
+    return totals["in"] / 1e6 * price[0] + totals["out"] / 1e6 * price[1]
+
+
+def spent_so_far(db_path, model: str) -> float:
+    """What the database says has already been spent, at `model` prices.
+
+    The budget ceiling has to survive a restart: a run stopped at $45 and resumed
+    must not spend $45 again. Every extracted row carries its own token counts, so
+    the ledger is the database rather than anything this process remembers.
+    """
+    agg = {"in": 0, "out": 0}
+    for table in totals_for(db_path).values():
+        agg["in"] += table["input_tokens"]
+        agg["out"] += table["output_tokens"]
+    return cost_of(agg, model)
 
 
 def ensure_schema(conn: sqlite3.Connection, table: str) -> None:
@@ -80,12 +104,15 @@ def _pending(conn: sqlite3.Connection, table: str, md_files, limit):
 
 
 def run(md_files, table, extract_fn, model, db_path, limit=None, workers=1,
-        label="acts", precheck=None) -> int:
+        label="acts", precheck=None, budget=None) -> int:
     """Extract `md_files` into `table`, `workers` calls at a time.
 
     `extract_fn(md_path)` returns `(record, message)` — the parsed record and the
     raw API message, whose usage is recorded alongside it. `precheck(md_path)`
     may return a reason string to skip an act *before* spending a call.
+    `budget` is a dollar ceiling on the **whole database**, not on this run:
+    submission stops as soon as recorded spend reaches it, so a corpus run
+    against a fixed pot of credit stops itself instead of failing on a 400.
     Returns the number of records written.
     """
     conn = sqlite3.connect(db_path)
@@ -94,6 +121,14 @@ def run(md_files, table, extract_fn, model, db_path, limit=None, workers=1,
 
     print(f"{len(md_files)} {label} selected; {already} already extracted; "
           f"{len(todo)} to do, {workers} at a time")
+    if budget:
+        prior = spent_so_far(db_path, model)
+        print(f"budget: ${budget:.2f} across {Path(db_path).name}; "
+              f"${prior:.2f} already spent, ${max(0.0, budget - prior):.2f} left")
+        if prior >= budget:
+            print("budget already exhausted — nothing submitted")
+            conn.close()
+            return 0
     if not todo:
         conn.close()
         return 0
@@ -101,6 +136,8 @@ def run(md_files, table, extract_fn, model, db_path, limit=None, workers=1,
     lock = threading.Lock()          # guards stdout only; SQLite stays single-threaded
     totals = {"in": 0, "out": 0, "cache_write": 0, "cache_read": 0}
     done = failed = skipped = 0
+    prior_cost = spent_so_far(db_path, model) if budget else 0.0
+    halted = False
 
     def work(md_path):
         reason = precheck(md_path) if precheck else None
@@ -111,52 +148,77 @@ def run(md_files, table, extract_fn, model, db_path, limit=None, workers=1,
 
     try:
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = {pool.submit(work, p): p for p in todo}
-            for n, fut in enumerate(as_completed(futures), 1):
-                md_path = futures[fut]
-                stem = md_path.stem
-                try:
-                    _, record, message, reason = fut.result()
-                except Exception as e:                      # noqa: BLE001 — recorded, not raised
-                    failed += 1
+            queue = iter(list(enumerate(todo, 1)))
+            inflight = {}
+            # Submit only `workers` acts at a time rather than all of them up
+            # front: the budget can only be enforced at a submission boundary,
+            # and a queue of 400 already-submitted calls has no such boundary.
+            while True:
+                while not halted and len(inflight) < workers:
+                    nxt = next(queue, None)
+                    if nxt is None:
+                        break
+                    n, md_path = nxt
+                    inflight[pool.submit(work, md_path)] = (n, md_path)
+                if not inflight:
+                    break
+                finished, _ = wait(inflight, return_when=FIRST_COMPLETED)
+                for fut in finished:
+                    n, md_path = inflight.pop(fut)
+                    stem = md_path.stem
+                    try:
+                        _, record, message, reason = fut.result()
+                    except Exception as e:                  # noqa: BLE001 — recorded, not raised
+                        failed += 1
+                        conn.execute(
+                            f"INSERT INTO {table} (filename, error) VALUES (?, ?) "
+                            f"ON CONFLICT(filename) DO UPDATE SET error=excluded.error",
+                            (stem, str(e)))
+                        conn.commit()
+                        with lock:
+                            print(f"[{n}/{len(todo)}] {stem} ERROR: {e}", flush=True)
+                        continue
+
+                    if reason:
+                        skipped += 1
+                        with lock:
+                            print(f"[{n}/{len(todo)}] {stem} skipped ({reason})", flush=True)
+                        continue
+
+                    u = usage_row(message, model)
+                    for k, key in (("in", "input_tokens"), ("out", "output_tokens"),
+                                   ("cache_write", "cache_creation_input_tokens"),
+                                   ("cache_read", "cache_read_input_tokens")):
+                        totals[k] += u[key]
                     conn.execute(
-                        f"INSERT INTO {table} (filename, error) VALUES (?, ?) "
-                        f"ON CONFLICT(filename) DO UPDATE SET error=excluded.error",
-                        (stem, str(e)))
+                        f"""INSERT INTO {table} (filename, data, processed_at, error, usage)
+                            VALUES (?, ?, datetime('now'), NULL, ?)
+                            ON CONFLICT(filename) DO UPDATE SET
+                                data=excluded.data, processed_at=datetime('now'),
+                                error=NULL, usage=excluded.usage""",
+                        (stem, json.dumps(record, ensure_ascii=False),
+                         json.dumps(u, ensure_ascii=False)))
                     conn.commit()
+                    done += 1
                     with lock:
-                        print(f"[{n}/{len(todo)}] {stem} ERROR: {e}", flush=True)
-                    continue
+                        print(f"[{n}/{len(todo)}] {stem} done "
+                              f"({u['input_tokens']:,} in / {u['output_tokens']:,} out)",
+                              flush=True)
 
-                if reason:
-                    skipped += 1
-                    with lock:
-                        print(f"[{n}/{len(todo)}] {stem} skipped ({reason})", flush=True)
-                    continue
-
-                u = usage_row(message, model)
-                for k, key in (("in", "input_tokens"), ("out", "output_tokens"),
-                               ("cache_write", "cache_creation_input_tokens"),
-                               ("cache_read", "cache_read_input_tokens")):
-                    totals[k] += u[key]
-                conn.execute(
-                    f"""INSERT INTO {table} (filename, data, processed_at, error, usage)
-                        VALUES (?, ?, datetime('now'), NULL, ?)
-                        ON CONFLICT(filename) DO UPDATE SET
-                            data=excluded.data, processed_at=datetime('now'),
-                            error=NULL, usage=excluded.usage""",
-                    (stem, json.dumps(record, ensure_ascii=False),
-                     json.dumps(u, ensure_ascii=False)))
-                conn.commit()
-                done += 1
-                with lock:
-                    print(f"[{n}/{len(todo)}] {stem} done "
-                          f"({u['input_tokens']:,} in / {u['output_tokens']:,} out)", flush=True)
+                if budget and not halted:
+                    running = prior_cost + cost_of(totals, model)
+                    if running >= budget:
+                        halted = True
+                        print(f"\n⛔ budget reached: ~${running:.2f} of ${budget:.2f} — "
+                              f"no further acts submitted; finishing {len(inflight)} in flight",
+                              flush=True)
     except KeyboardInterrupt:
         # Everything already written is committed; say so rather than implying loss.
         print(f"\nInterrupted — {done} записів збережено.", file=sys.stderr)
 
     summary(model, totals, done, failed, skipped, db_path)
+    if halted:
+        print("  stopped by --budget; re-run with a higher ceiling to continue")
     conn.close()
     return done
 
@@ -166,10 +228,9 @@ def summary(model, totals, done, failed, skipped, db_path) -> None:
     print(f"  tokens : {totals['in']:,} in  ·  {totals['out']:,} out"
           + (f"  ·  {totals['cache_write']:,} cache-write" if totals["cache_write"] else "")
           + (f"  ·  {totals['cache_read']:,} cache-read" if totals["cache_read"] else ""))
-    price = PRICES.get(model)
-    if price and done:
-        cost = totals["in"] / 1e6 * price[0] + totals["out"] / 1e6 * price[1]
-        print(f"  cost   : ~${cost:.2f} at list ({model}); ~${cost/done:.3f} per act")
+    if PRICES.get(model) and done:
+        cost = cost_of(totals, model)
+        print(f"  cost   : ~${cost:.2f} ({model}); ~${cost/done:.3f} per act")
     print(f"  model  : {model}   database: {db_path}")
 
 
@@ -212,6 +273,7 @@ if __name__ == "__main__":
     every = {m for a in tot.values() for m in a["models"]}
     print(f"{'TOTAL':12}{sum(a['acts'] for a in tot.values()):>6}{gi:>14,}{go:>12,}")
     if len(every) == 1 and (p := PRICES.get(next(iter(every)))):
-        print(f"\n  ~${gi/1e6*p[0] + go/1e6*p[1]:.2f} at list prices for {next(iter(every))}")
+        print(f"\n  ~${gi/1e6*p[0] + go/1e6*p[1]:.2f} at {next(iter(every))} prices "
+              f"(${p[0]:.2f}/${p[1]:.2f} per MTok)")
     elif len(every) > 1:
         print(f"\n  ⚠ mixed provenance: {', '.join(sorted(every))}")

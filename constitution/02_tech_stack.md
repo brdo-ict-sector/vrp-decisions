@@ -109,6 +109,13 @@ accounting could be added in one place instead of three.
   lands, so an interrupted run keeps everything already finished.
 - **`max_retries=8`** on the client, above the SDK default of 2. An 862-act run will meet a 429 or
   an overloaded response eventually, and losing an act to one is pure waste.
+- **`--budget N` is a ceiling in dollars on the whole database**, not on one run. Acts are
+  submitted `--workers` at a time rather than all at once, because the budget can only be
+  enforced at a submission boundary and a queue of 400 already-submitted calls has none. Spend is
+  read back from the per-row `usage` blobs (`spent_so_far()`), so the ceiling survives a restart:
+  a run stopped at \$45 and resumed does not spend \$45 again. Acts dropped by a `precheck` cost
+  nothing and do not count against it. This is what makes a corpus run against a fixed pot of
+  credit stop itself instead of failing act after act on a 400.
 - **Every row records what it cost and which model wrote it** — `usage` is a JSON blob
   (`input_tokens`, `output_tokens`, cache counters, `model`) rather than columns, so a new field in
   the API response needs no migration. `python code/extract_runner.py [db]` prints the per-table
@@ -249,11 +256,25 @@ converted **once**: a file already downloaded, or already converted to Markdown,
   (1 755 tokens) — it is dominated by the per-act schema, whose complaint-number enum is rebuilt
   for every act, so the prefix differs each call and can never be read back. The only effect was
   the 1.25× write premium. Removed; verified `cache_creation_input_tokens` is now 0.
-- **Cost.** ~30M input and ~2.5M output tokens for the 862 unextracted acts — about **$85** at
-  Sonnet 5's introductory rate, ~$128 at list (Opus 5 would have been ~$213). Note that **39% of
-  the input is schema, not evidence**: ~14 000 tokens of JSON Schema ride along on every call,
-  comparable to the act itself. That is the price of the enum constraint that stops the model
-  inventing grounds and join keys, and it is the largest remaining optimisation.
+- **Cost — measured, not estimated (2026-07-29).** 387 acts cost **\$42.97**: 14.9M input and
+  1.27M output tokens, **\$0.111 per act**, at Sonnet 5's introductory \$2/\$10 per MTok. The
+  per-act figure is steady across act types (рішення \$0.117, ухвали \$0.111, ВРП \$0.135) and
+  across the run, so it forecasts well: multiply by acts remaining. At that rate the corpus as it
+  stood — 912 unextracted acts, up from 862 because ingestion keeps adding — prices at **~\$91**.
+  `PRICES` in `extract_runner.py` carries the **introductory** rate, which expires **2026-08-31**;
+  after that the same run costs 1.5× (\$3/\$15), so re-check the table before trusting an estimate
+  made now. Note that **39% of the input is schema, not evidence**: ~14 000 tokens of JSON Schema
+  ride along on every call, comparable to the act itself. That is the price of the enum constraint
+  that stops the model inventing grounds and join keys, and it is the largest remaining
+  optimisation.
+- **`--max-tokens` (stage 22).** `MAX_TOKENS` caps thinking *and* JSON together, so a long
+  multi-judge ухвала can exhaust it and return a record cut off mid-string. `1161_10.06.2026`
+  (129k chars, 7 judges) needed **22 305 output tokens** and failed three times at the 16 000
+  default. Above 16 000 the SDK refuses a non-streaming call it estimates will outlive the HTTP
+  timeout, so a raised ceiling routes through `messages.stream()`; the default path is unchanged.
+  A `stop_reason` of `max_tokens` now raises *«truncated at max_tokens=…»* rather than letting
+  `json.loads` report an unterminated string 9 000 characters in — the fix is a bigger ceiling,
+  not a parser.
 - **Schema-enforced output.** Extraction sets `output_config.format` to the canonical JSON
   Schema in `code/extraction_schema.py` (dumped to `extraction_schema.json`,
   `ruling_schema.json` and `review_schema.json`). Structured outputs guarantee the result
@@ -278,8 +299,9 @@ converted **once**: a file already downloaded, or already converted to Markdown,
   - per judge — ПІБ, court, position;
   - **кваліфікація діяння** per stage (скарга → ДП) as a list of grounds drawn
     from a **fixed enum** (`ART106_GROUNDS` — short labels like
-    `"106-2 безпідставне затягування розгляду справи"`, corpus-only) plus a free-text
-    `note` for nuance;
+    `"106-2 безпідставне затягування розгляду справи"`) plus a free-text
+    `note` for nuance. The enum covers **all 25 підстав** of ст. 106 part one, including the six
+    subpoints that were absent until 2026-07-29 — see *The Art. 106 enum* below;
   - **conduct** summary per stage;
   - **стягнення** per judge, twice over: `sanction` keeps the act's own wording, and
     `sanction_type` normalizes it to the ст. 109 vocabulary (`попередження` / `догана` /
@@ -313,6 +335,37 @@ converted **once**: a file already downloaded, or already converted to Markdown,
   Those 32 acts are inside the corpus window and the corpus run re-extracts them properly.
   `data/reference/manual_extractions.json` is kept as provenance for the records currently
   published on the site.
+
+### The Art. 106 enum
+
+`ART106_GROUNDS` is the vocabulary every act type is filtered by, so a defect in it is a defect
+in the whole dataset. Three were found by auditing the extracted corpus on 2026-07-29 and fixed
+the same day; all three are worth remembering, because each was invisible in the output.
+
+- **It covered 19 of the statute's 25 підстав.** Missing: 106-7 (конфлікт інтересів), 106-12
+  (недоброчесна поведінка / невідповідність рівня життя), 106-14, 106-14-1, 106-16, 106-18. A
+  ground with no enum value does not fail — the model writes it into the free-text `note`, where
+  no facet can reach it. Notes said so outright: *«не встановила ознак проступку за пунктом 12
+  частини першої статті 106…»*. Re-extracting 35 affected acts turned **17 mentions of 106-12**
+  from prose into a filterable ground, enough to rank it 9th of 25 corpus-wide.
+- **One label welded two unrelated grounds together.** `106-19` read *порушення правил
+  самовідводу / недостовірне декларування* — пункт 1д bolted onto пункт 19, with 1д already
+  holding its own value. Both halves were in live use, so the facet returned a mixed bag. It now
+  reads *недостовірні твердження в декларації доброчесності*. `106-9` was reworded in the same
+  pass, because adding 106-16 and 106-18 would have left three overlapping «неподання декларації»
+  values for the model to guess between.
+- **Structured outputs are not an absolute guarantee.** 13 of 1 580 ground mentions (0.8%) came
+  back differing from their enum member only in the case of the first letter. A reader cannot see
+  it; an exact-match facet lists the same ground twice. `26_normalize_grounds.py` folds such
+  values back deterministically — case- and whitespace-insensitively, and **only** onto an actual
+  enum member; anything that does not fold is reported and left alone, since silently rewriting a
+  real disagreement into conformity would be worse than the drift.
+
+**Rule for changing the enum.** The first seven labels are frozen — round-2 extractions and
+`docs/decisions.json` carry them verbatim. Outside those seven a reword is allowed **only
+together with re-extraction of every act carrying the old label**: a stored value that is no
+longer an enum member is worse than a bad label, because nothing downstream can validate it.
+Appending is always safe, but only reaches records extracted afterwards.
 
 ### Storage
 - **SQLite** (`data/decisions.db`) — the working store, keyed by act filename: `decisions`

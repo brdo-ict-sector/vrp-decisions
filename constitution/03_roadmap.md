@@ -21,7 +21,7 @@ Two words were doing the same job in earlier drafts. From now on:
 | Phase | Stages | What it produces | State |
 |-------|--------|------------------|-------|
 | **1 · Ingestion** | `11_scrape_register` → `12_select_and_download` → `13_transform_raw_to_md` → `14_extract_complaint_numbers` | Every disciplinary act as Markdown, plus its complaint number(s) in the register | ✅ **Operating.** Runs nightly, unattended. 935/935 acts converted. |
-| **2 · Extraction** | `21_extract_decisions` (ДП рішення), `22_extract_rulings` (ухвали), `24_extract_reviews` (ВРП перегляди) | One structured record per act in SQLite, against `DECISION_SCHEMA` / `RULING_SCHEMA` / `REVIEW_SCHEMA` | 🚧 **Sampled, not run.** 5/325 ДП рішення, 14/485 ухвали, 4/111 ВРП переглядів (14 of the 125 ВРП acts review no palate decision and are skipped). Schemas rebuilt around the per-judge grain 2026-07-29; model switched to `claude-sonnet-5` after a 20-act A/B against Opus 5. 862 acts remain, estimated ~\$85. |
+| **2 · Extraction** | `21_extract_decisions` (ДП рішення), `22_extract_rulings` (ухвали), `24_extract_reviews` (ВРП перегляди) | One structured record per act in SQLite, against `DECISION_SCHEMA` / `RULING_SCHEMA` / `REVIEW_SCHEMA` | 🚧 **Recent half extracted.** 161/325 ДП рішення, 206/485 ухвали, 43/125 ВРП переглядів — 410 records, newest-first, for **\$46.86** of a \$50 budget (2026-07-29). Unbroken from the newest act back to **03.11.2025** (рішення), **05.11.2025** (ухвали), **23.12.2025** (ВРП). The remaining ~500 acts need roughly **\$56** more. |
 | **3 · Merge** | `31_merge_proceedings` *(not written)*, `32_export_to_json` | One record per **proceeding** — one judge × one complaint, with its ухвала, рішення and ВРП review attached | ⛔ **Not built.** `32` exports decision records only, flattening to a lead judge for the current UI. |
 
 Phase 1 is done and self-maintaining. Phase 2 is a money question, not an engineering one.
@@ -75,7 +75,8 @@ Let the source define the corpus instead of a hand-assembled batch.
 
 ### M4 · Extraction across the corpus 🚧 *(current)*
 
-The corpus is ingested; almost none of it is extracted.
+The corpus is ingested; the recent half is now extracted, and what stops the rest is credit
+rather than code.
 
 - [x] Ухвала schema verified on a hand-checked sample (6 acts, 2026-07-29) — the
       `requested → opened → rejected` split reproduces the narrowing correctly.
@@ -105,15 +106,36 @@ The corpus is ingested; almost none of it is extracted.
 - [x] Clear the 32 legacy decision rows so they pick up the new schema (done 2026-07-29).
 - [x] Discard all Opus-extracted rows and re-key the working store to Sonnet output only
       (2026-07-29), so the corpus has one model's provenance rather than two.
-- [ ] Run stage 21 over all 325 ДП рішення — **one** run, with every schema change included.
-- [ ] Run stage 22 over all 485 ухвали, and stage 24 over all 125 ВРП переглядів.
-- [x] Cost controls: resumability (skip-if-done), per-row token+model accounting, and a
-      measured estimate (~$85 at introductory pricing) to check the invoice against.
+- [x] **Corpus run under a fixed budget** (2026-07-29). \$50 of credit against a ~\$91 corpus, so
+      the run was ordered newest-first in four waves that advance all three act types together —
+      finishing one type and starving the others would have left the recent end incoherent.
+      387 acts for \$42.97, then 35 re-extracted for \$3.89 (below). Zero unrecovered failures.
+- [x] **Budget ceiling in the runner** (`--budget`), enforced at the submission boundary and read
+      back from stored `usage`, so it survives restarts. It never had to trip — the wave plan and
+      the ceiling converged — but it is what makes an unattended run against finite credit safe.
+- [x] **`sanction_type` verified, not assumed.** All 80 judge entries carrying a sanction name it
+      in `summary.essence`, and догана is never stated where сувора догана was imposed. That was
+      the stakeholder's complaint (8 of 9 failing before); it is closed.
+- [x] **Art. 106 enum completed to all 25 підстав**, one conflated label split, one disambiguated,
+      and 35 affected acts re-extracted — 17 mentions of 106-12 recovered from free text. See
+      `02_tech_stack.md` → *The Art. 106 enum*.
+- [ ] Extract the remaining ~500 acts (roughly \$56 at the measured \$0.111/act, or 1.5× that
+      after Sonnet 5's introductory pricing ends **2026-08-31**).
+- [x] Cost controls: resumability (skip-if-done), per-row token+model accounting, a `--budget`
+      ceiling, and a measured **\$0.111 per act** to forecast and check the invoice against.
 - [ ] Re-export and publish.
 
 **Exit criteria:** every act in the register has a structured record or a logged error;
 `sanction_type` populated for every рішення; the published dataset covers the whole 2025–2026
 corpus rather than a 32-record sample.
+
+**Where a resumed run picks up.** `--limit N` means "the next N *not-yet-extracted* acts, newest
+first", so continuing needs no bookkeeping — the first gap in each type is `2189_22.10.2025`
+(рішення), `2322_05.11.2025` (ухвали), `2799_23.12.2025` (ВРП).
+
+**Site not yet updated.** Stage 32 has not been run against this data: `docs/decisions.json` and
+the published site still carry the round-2 sample of 32 records. Nothing of this corpus run is
+visible to a reader yet.
 
 **Known gap:** all three extract stages skip rows that already carry `data`, so a schema change
 does not reach already-extracted records — clear the affected rows before re-running. This is the

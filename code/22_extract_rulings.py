@@ -147,7 +147,7 @@ def already_processed(conn: sqlite3.Connection, filename: str) -> bool:
 
 
 def extract_file(client: anthropic.Anthropic, md_path: Path, stage_14,
-                 model: str = MODEL) -> dict:
+                 model: str = MODEL, max_tokens: int = MAX_TOKENS) -> dict:
     ruling_text = md_path.read_text(encoding="utf-8")
 
     # Constrain the complaint-number fields to what stage 14 found in THIS act.
@@ -157,9 +157,9 @@ def extract_file(client: anthropic.Anthropic, md_path: Path, stage_14,
     # Head *and* tail: what the palate opened on is stated in the last paragraph.
     ruling_text = clip_for_model(ruling_text, MAX_CHARS)
 
-    message = client.messages.create(
+    request = dict(
         model=model,
-        max_tokens=MAX_TOKENS,
+        max_tokens=max_tokens,
         thinking={"type": "adaptive"},
         # No cache_control. It was here on the theory that an identical system
         # prompt across the batch would turn ~500 prefills into cache reads, and
@@ -176,8 +176,24 @@ def extract_file(client: anthropic.Anthropic, md_path: Path, stage_14,
                    "content": USER_PROMPT_TEMPLATE.format(ruling_text=ruling_text)}],
     )
 
+    # Above ~16k the SDK refuses a non-streaming call it estimates will outlive
+    # the HTTP timeout, so a raised ceiling has to stream. `1161_10.06.2026` is
+    # the act that forced this: 129k chars and many judges, and `max_tokens`
+    # caps thinking *and* JSON together, so the record came back cut mid-string.
+    if max_tokens > MAX_TOKENS:
+        with client.messages.stream(**request) as stream:
+            message = stream.get_final_message()
+    else:
+        message = client.messages.create(**request)
+
     if message.stop_reason == "refusal":
         raise RuntimeError(f"refused ({getattr(message.stop_details, 'category', None)})")
+    # Say "truncated" rather than letting json.loads report an unterminated
+    # string 9 000 characters in — the fix is a bigger ceiling, not a parser.
+    if message.stop_reason == "max_tokens":
+        raise RuntimeError(
+            f"truncated at max_tokens={max_tokens} — re-run this act with a higher "
+            f"--max-tokens (thinking and JSON share the ceiling)")
 
     # output_config.format guarantees the response carries a text block of valid JSON.
     text = next((b.text for b in message.content if b.type == "text"), None)
@@ -210,6 +226,12 @@ def main():
                          "backfill a whole case rather than a recent window")
     ap.add_argument("--workers", type=int, default=6,
                     help="concurrent API calls (default 6); lower it if you see 429s")
+    ap.add_argument("--max-tokens", type=int, default=MAX_TOKENS,
+                    help=f"output ceiling per act, thinking included (default {MAX_TOKENS}); "
+                         "raise it for a long multi-judge ухвала that comes back truncated")
+    ap.add_argument("--budget", type=float,
+                    help="stop submitting acts once recorded spend across the whole "
+                         "database reaches this many dollars (survives restarts)")
     args = ap.parse_args()
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -227,9 +249,9 @@ def main():
     client = anthropic.Anthropic(api_key=api_key, max_retries=8)
     extract_runner.run(
         md_files, "rulings",
-        lambda p: extract_file(client, p, stage_14, args.model),
+        lambda p: extract_file(client, p, stage_14, args.model, args.max_tokens),
         model=args.model, db_path=args.db, limit=args.limit,
-        workers=args.workers, label="ухвал",
+        workers=args.workers, budget=args.budget, label="ухвал",
     )
 
 

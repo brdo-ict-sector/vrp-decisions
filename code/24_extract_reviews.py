@@ -237,6 +237,9 @@ def main():
                          "backfill a whole case rather than a recent window")
     ap.add_argument("--workers", type=int, default=6,
                     help="concurrent API calls (default 6); lower it if you see 429s")
+    ap.add_argument("--budget", type=float,
+                    help="stop submitting acts once recorded spend across the whole "
+                         "database reaches this many dollars (survives restarts)")
     args = ap.parse_args()
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -257,7 +260,7 @@ def main():
         md_files, "reviews",
         lambda p: extract_file(client, p, stage_14, args.model),
         model=args.model, db_path=args.db, limit=args.limit,
-        workers=args.workers, label="рішень ВРП",
+        workers=args.workers, budget=args.budget, label="рішень ВРП",
         precheck=lambda p: None if reviews_a_decision(p) else
             'ВРП акт, але не переглядає рішення палати',
     )
