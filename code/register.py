@@ -72,7 +72,15 @@ def stems(register_path: Path, keep) -> list[str]:
     return [stem_of(r) for r in records(register_path) if keep(r)]
 
 
-def markdown_files(markdown_dir: Path, ordered_stems: list[str]) -> list[Path]:
-    """Markdown paths for `ordered_stems`, keeping that order and skipping gaps."""
+def markdown_files(markdown_dir: Path, ordered_stems: list[str],
+                   only: list[str] | None = None) -> list[Path]:
+    """Markdown paths for `ordered_stems`, keeping that order and skipping gaps.
+
+    `only` narrows the result to named stems. Newest-first is the right default,
+    but it cannot produce a linked case: an ухвала and the рішення it opens are
+    six to eighteen months apart, so any recent window holds one end or the other
+    and never both. Naming acts explicitly is how a whole case gets extracted.
+    """
     available = {p.stem: p for p in markdown_dir.glob("*.md")}
-    return [available[stem] for stem in ordered_stems if stem in available]
+    stems = ordered_stems if only is None else [s for s in ordered_stems if s in set(only)]
+    return [available[stem] for stem in stems if stem in available]

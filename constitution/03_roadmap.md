@@ -21,7 +21,7 @@ Two words were doing the same job in earlier drafts. From now on:
 | Phase | Stages | What it produces | State |
 |-------|--------|------------------|-------|
 | **1 · Ingestion** | `11_scrape_register` → `12_select_and_download` → `13_transform_raw_to_md` → `14_extract_complaint_numbers` | Every disciplinary act as Markdown, plus its complaint number(s) in the register | ✅ **Operating.** Runs nightly, unattended. 935/935 acts converted. |
-| **2 · Extraction** | `21_extract_decisions` (ДП рішення), `22_extract_rulings` (ухвали), `24_extract_reviews` (ВРП перегляди), `23_load_manual_extractions` | One structured record per act in SQLite, against `DECISION_SCHEMA` / `RULING_SCHEMA` / `REVIEW_SCHEMA` | 🚧 **Barely started.** 32/325 ДП рішення, 6/485 ухвали, 2/125 ВРП переглядів. Schemas rebuilt around the per-judge grain 2026-07-29; the corpus run has not been paid for. |
+| **2 · Extraction** | `21_extract_decisions` (ДП рішення), `22_extract_rulings` (ухвали), `24_extract_reviews` (ВРП перегляди) | One structured record per act in SQLite, against `DECISION_SCHEMA` / `RULING_SCHEMA` / `REVIEW_SCHEMA` | 🚧 **Sampled, not run.** 5/325 ДП рішення, 14/485 ухвали, 4/111 ВРП переглядів (14 of the 125 ВРП acts review no palate decision and are skipped). Schemas rebuilt around the per-judge grain 2026-07-29; model switched to `claude-sonnet-5` after a 20-act A/B against Opus 5. 862 acts remain, estimated ~\$85. |
 | **3 · Merge** | `31_merge_proceedings` *(not written)*, `32_export_to_json` | One record per **proceeding** — one judge × one complaint, with its ухвала, рішення and ВРП review attached | ⛔ **Not built.** `32` exports decision records only, flattening to a lead judge for the current UI. |
 
 Phase 1 is done and self-maintaining. Phase 2 is a money question, not an engineering one.
@@ -92,22 +92,32 @@ The corpus is ingested; almost none of it is extracted.
       model; matches the model's previous answer on all 32 existing records.
 - [x] Stage 21 confined to ДП рішення — it globbed all 935 Markdown files and would have
       extracted ухвали and reviews against the wrong schema.
-- [x] Reconcile the model pinned by each extraction stage — all three now run `claude-opus-5`
-      at `MAX_TOKENS` 16000.
-- [x] Clear the 32 legacy decision rows so they pick up the new schema (done 2026-07-29; the
-      `decisions` table is empty and `docs/decisions.json` still holds the published sample).
+- [x] Reconcile the model pinned by each extraction stage — all three now run `claude-sonnet-5`
+      at `MAX_TOKENS` 16000, chosen over `claude-opus-5` on a 20-act A/B (140/145 fields agree,
+      identical judge identification, ~40% cheaper). See `02_tech_stack.md` → Why Sonnet.
+- [x] Order extraction newest-act-first (`register.py`); add `--only` to backfill whole cases.
+- [x] Stop clipping act text (`MAX_CHARS` 500 000) — the old 160 000 tail-clip removed the
+      operative part, and with it the sanction, on the 30 longest acts.
+- [x] Skip the 14 ВРП acts that review no palate decision, before spending an API call.
+- [x] Drop `cache_control` from stages 22/24 — measured 0 cache reads, 1.25× write premium.
+- [x] Factor the shared extraction loop into `extract_runner.py`; add `--workers` (default 6,
+      ~5× faster) and per-row usage + model accounting (`python code/extract_runner.py` reports).
+- [x] Clear the 32 legacy decision rows so they pick up the new schema (done 2026-07-29).
+- [x] Discard all Opus-extracted rows and re-key the working store to Sonnet output only
+      (2026-07-29), so the corpus has one model's provenance rather than two.
 - [ ] Run stage 21 over all 325 ДП рішення — **one** run, with every schema change included.
 - [ ] Run stage 22 over all 485 ухвали, and stage 24 over all 125 ВРП переглядів.
-- [ ] Cost controls for a run of that size (batching, spend ceiling, resumability).
+- [x] Cost controls: resumability (skip-if-done), per-row token+model accounting, and a
+      measured estimate (~$85 at introductory pricing) to check the invoice against.
 - [ ] Re-export and publish.
 
 **Exit criteria:** every act in the register has a structured record or a logged error;
 `sanction_type` populated for every рішення; the published dataset covers the whole 2025–2026
 corpus rather than a 32-record sample.
 
-**Known gap:** all three extract stages skip rows that already carry `data`, so schema changes
-do not reach already-extracted records. The 32 existing decisions predate `complaint_number`,
-`sanction_type` and the per-judge grain, and must have their rows cleared.
+**Known gap:** all three extract stages skip rows that already carry `data`, so a schema change
+does not reach already-extracted records — clear the affected rows before re-running. This is the
+same property that makes a long run resumable, so it is a trade-off rather than a defect.
 
 ### M5 · Proceedings merge
 

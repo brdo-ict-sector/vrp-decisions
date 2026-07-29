@@ -46,10 +46,21 @@ Turn each act into a structured record. Costs money per act; run by hand.
 | 21 | `21_extract_decisions.py` | Claude API: summaries + the structured Art. 106 schema for **рішення дисциплінарної палати** (325 acts); store to SQLite. |
 | 22 | `22_extract_rulings.py` | Same for **ухвали про відкриття справи** (485 acts), against their own schema. |
 | 24 | `24_extract_reviews.py` | Same for **рішення ВРП про перегляд** (125 acts) — the second-instance act type. |
-| 23 | `23_load_manual_extractions.py` | Stopgap loader for hand-drafted records in the same schema, for when no API key is available. |
 
 Each stage selects its own acts from the register by act number, and the three sets partition
 the corpus exactly: 485 + 325 + 125 = 935, no overlap.
+
+Every stage reads the register through `register.py` and works **newest act first**. The stages
+used to glob the Markdown directory and sort it, which sorts by act serial as a *string* — so
+`--limit 50` extracted acts 1004–1049 from mid-2025 rather than the 50 most recent. Order now
+comes from `Дата прийняття`, so a partial run leaves the recent end covered. `--only STEM …`
+overrides the order to name specific acts, which is how a whole case gets backfilled: an ухвала
+and the рішення it opens are six to eighteen months apart, so no recent window contains both.
+
+Stage 24 additionally skips ВРП acts that quote no palate decision number — 14 of 125. Those are
+ВККСУ подання про звільнення, complaints against disciplinary inspectors, and висновки про заходи
+щодо забезпечення незалежності суддів: real ВРП acts, but not reviews of anything. The check is
+free (it reads the same text the model would have been sent) and runs *before* the API call.
 
 ### Phase 3 — Merge (`3x`)
 
@@ -59,11 +70,54 @@ Assemble acts into proceedings and publish. **Stage 31 is not written yet** — 
 | Stage | Script | Purpose |
 |-------|--------|---------|
 | 31 | `31_merge_proceedings.py` *(planned)* | Resolve judges and build one record per **proceeding** (judge × complaint) from `rulings` + `decisions` + `reviews`. |
-| 32 | `32_export_to_json.py` | Export records from SQLite to `docs/decisions.json` for the site. Today it exports decision records, flattening the lead judge into the fields the current UI expects. |
+| 32 | `32_export_to_json.py` | Export records from SQLite to `docs/decisions.json` for the site, attaching each decision's ухвала and ВРП review via `joins.py`. `--output` writes elsewhere, so a batch can be reviewed in the UI before it is published. |
+
+Until stage 31 exists, `joins.py` does the decision-centred half of the merge: the рішення ДП is
+the record, with its ухвала and its ВРП review attached. Two rules keep those joins honest. **A
+null key never joins** — four acts carry no complaint number (two name the complaint only by
+complainant, one is a ВККСУ referral), and matching them on "both are null" silently linked all
+four to each other. **The register's `Ключ справи` is not the key** — it strips the letter prefix
+and the middle segment, so `М-6/19/7-22` collapses to `6/7-22`, a key shared by 36 unrelated acts.
+The join uses the full complaint number *and* requires a judge in common; a decision's judge is
+matched to *their own* entry in the ухвала, with no fallback to the first entry, because
+attributing one judge's misconduct to another is the worst failure this system can produce.
 
 Shared rule modules carry no stage number, because they are libraries rather than steps:
-`extraction_schema.py` (the schemas) and `act_numbers.py` (who issued an act, and which act a
-review reviews).
+
+| Module | What it owns |
+|---|---|
+| `extraction_schema.py` | the three schemas, the shared vocabularies, the union budget, and `clip_for_model()` |
+| `act_numbers.py` | who issued an act, which chamber, and which decision a review reviews |
+| `register.py` | one ordered read of the register — newest act first, plus `--only` selection |
+| `joins.py` | attaching an ухвала and a ВРП review to the рішення they belong to |
+| `compare_models.py` | field-by-field A/B of two models' extractions of the same acts |
+| `extract_runner.py` | the loop all three extraction stages run: parallel dispatch, upsert, usage accounting |
+
+### The extraction loop: concurrency and accounting
+
+Stages 21, 22 and 24 differ only in which acts they select, which schema they enforce and which
+table they write; everything around that — skip-if-done, try/except, upsert, progress line — was
+copied three times. `extract_runner.py` owns it once, which is why parallelism and usage
+accounting could be added in one place instead of three.
+
+- **`--workers N` (default 6).** Extraction is I/O-bound — nearly all wall-clock is spent waiting
+  on the API — so threads help and processes would not. Measured: 6 ухвали in **76 seconds** at
+  `--workers 6`, against roughly 6 minutes sequentially. Lower it if the API starts returning 429.
+- **Only the main thread touches SQLite.** Workers call the API; results come back through
+  `as_completed()` and are written by the main thread. SQLite serialises writers, so a pool of
+  writing threads buys `database is locked` retries and no throughput. Each row is committed as it
+  lands, so an interrupted run keeps everything already finished.
+- **`max_retries=8`** on the client, above the SDK default of 2. An 862-act run will meet a 429 or
+  an overloaded response eventually, and losing an act to one is pure waste.
+- **Every row records what it cost and which model wrote it** — `usage` is a JSON blob
+  (`input_tokens`, `output_tokens`, cache counters, `model`) rather than columns, so a new field in
+  the API response needs no migration. `python code/extract_runner.py [db]` prints the per-table
+  totals and flags mixed provenance. Rows written before this existed have `usage NULL`; the column
+  is added automatically to older databases by `ensure_schema()`.
+
+Recording the model per row is the durable fix for the provenance problem that made mixing Opus
+and Sonnet output dangerous: a corpus can now say which model produced each record, instead of
+depending on someone remembering when the default changed.
 
 Phase 1 runs unattended every night; phases 2 and 3 are run by hand — see
 [Daily ingest](#daily-ingest) below.
@@ -166,10 +220,40 @@ converted **once**: a file already downloaded, or already converted to Markdown,
 
 ### AI extraction & summarization
 - **Anthropic Claude API** via the official `anthropic` Python SDK.
-- **Model:** `claude-opus-5` on every extraction stage, with adaptive thinking. The system
+- **Model:** `claude-sonnet-5` on every extraction stage, with adaptive thinking. The system
   prompt fixes the role (Ukrainian judicial-discipline analyst). `MAX_TOKENS` is 16000
   throughout — it caps thinking *and* response together, and the per-judge arrays make the
   response longer than the single-judge schema did.
+- **Why Sonnet and not Opus.** Both models extracted the same 20 acts (13 ухвали, 5 рішення ДП,
+  2 ВРП перегляди) into separate databases; `code/compare_models.py` compared them field by
+  field. They agreed on **140 of 145** structured fields, and — the property that matters most —
+  named **the same judges in every act**. Of the five disagreements, one was a schema limitation
+  (an act whose operative part states both «відмовити у притягненні» *and* «провадження
+  припинити», where `outcome` allows one), two were a single Opus error (a ground the act never
+  mentions), and two were a single Sonnet error (an inspector proposal inferred from the palate's
+  decision). One substantive mistake each, on a sample where one field is 0.7% — enough to show
+  the models are comparable, not enough to rank them. Sonnet costs ~40% less at list and ~60%
+  less at the introductory rate, and tokenizes this corpus identically (2.41 chars/token,
+  measured with `count_tokens`), so the saving is the price ratio with no token penalty.
+- **Text is never clipped.** `MAX_CHARS` is 500 000, above the largest act in the corpus
+  (429 497 chars), so every act reaches the model whole. It was 160 000, which truncated the
+  *tail* — and a ВРП act states its outcome last. In act 617/2дп/15-26 the operative paragraph
+  begins at character 184 572 of 185 491, so the clip removed the sanction and nothing else:
+  the record came back with a null sanction for a judge the palate had moved to dismiss.
+  `clip_for_model()` survives as a guard for an act longer than any yet seen, and keeps the
+  head *and* the tail rather than the head alone.
+- **No prompt caching.** `cache_control` was set on the system prompt of stages 22 and 24 on the
+  theory that an identical prompt across a batch would turn hundreds of prefills into cache
+  reads. Measurement disproved it: `cache_read_input_tokens` was 0 on every call while
+  `cache_creation_input_tokens` was ~15 700. The cached prefix is not the system prompt
+  (1 755 tokens) — it is dominated by the per-act schema, whose complaint-number enum is rebuilt
+  for every act, so the prefix differs each call and can never be read back. The only effect was
+  the 1.25× write premium. Removed; verified `cache_creation_input_tokens` is now 0.
+- **Cost.** ~30M input and ~2.5M output tokens for the 862 unextracted acts — about **$85** at
+  Sonnet 5's introductory rate, ~$128 at list (Opus 5 would have been ~$213). Note that **39% of
+  the input is schema, not evidence**: ~14 000 tokens of JSON Schema ride along on every call,
+  comparable to the act itself. That is the price of the enum constraint that stops the model
+  inventing grounds and join keys, and it is the largest remaining optimisation.
 - **Schema-enforced output.** Extraction sets `output_config.format` to the canonical JSON
   Schema in `code/extraction_schema.py` (dumped to `extraction_schema.json`,
   `ruling_schema.json` and `review_schema.json`). Structured outputs guarantee the result
@@ -221,8 +305,14 @@ converted **once**: a file already downloaded, or already converted to Markdown,
   and a complainant contesting a refusal are opposite situations — and, per judge, the
   `review_outcome` (залишено без змін / скасовано повністю / частково / змінено стягнення) with
   the sanction **in force after review**. A quashed sanction must never read as standing.
-- **Stopgap loader:** `23_load_manual_extractions.py` loads hand-drafted records in the
-  same schema when no API key is available; once a key is set, stage 21 regenerates them.
+- **Removed — the stopgap loader.** `23_load_manual_extractions.py` loaded hand-drafted records
+  for when no API key was available. Both halves of its premise are gone: a key is configured,
+  and its 32 records are in the pre-per-judge shape (`judge_name` flat, no `judges[]`). Loading
+  them now would inject legacy-shape rows into a per-judge corpus — the shape that silently
+  skewed the first Opus-vs-Sonnet comparison until `compare_models.py` learned to exclude it.
+  Those 32 acts are inside the corpus window and the corpus run re-extracts them properly.
+  `data/reference/manual_extractions.json` is kept as provenance for the records currently
+  published on the site.
 
 ### Storage
 - **SQLite** (`data/decisions.db`) — the working store, keyed by act filename: `decisions`
@@ -264,7 +354,8 @@ docs/                         # published by GitHub Pages
   decisions.json              # dataset consumed by the site (stage 32)
   index.html                  # the application
 code/                         # the pipeline scripts (1x ingestion, 2x extraction, 3x merge)
-                              #   + extraction_schema.py, act_numbers.py, run_daily.sh
+                              #   + extraction_schema.py, act_numbers.py, register.py,
+                              #     joins.py, compare_models.py, run_daily.sh
 deploy/                       # systemd unit + timer for the nightly ingest
 constitution/                 # SDD documents (requirements, mission, this file, roadmap, specs)
 ```

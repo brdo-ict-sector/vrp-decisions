@@ -35,6 +35,7 @@ from pathlib import Path
 import anthropic
 
 import act_numbers
+import extract_runner
 import register
 from extraction_schema import (
     APPELLANT_TYPES,
@@ -43,6 +44,7 @@ from extraction_schema import (
     REVIEW_OUTCOMES,
     REVIEW_SCHEMA,
     SANCTION_TYPES,
+    clip_for_model,
     enforce_no_candidates,
     with_complaint_candidates,
     with_review_candidates,
@@ -54,9 +56,10 @@ MARKDOWN_DIR = BASE_DIR / "data" / "acts" / "md"
 REGISTER_PATH = BASE_DIR / "data" / "register" / "hcj_acts_selected.xlsx"
 DB_PATH = BASE_DIR / "data" / "decisions.db"
 
-MODEL = "claude-opus-5"
+MODEL = "claude-sonnet-5"  # A/B tested against Opus 5 on 20 acts: 96.6% agreement on
+                          # structured fields, no judge-identity differences, ~40% cheaper.
 MAX_TOKENS = 16000
-MAX_CHARS = 160_000
+MAX_CHARS = 500_000  # the whole act: the largest in the corpus is ~430k chars
 
 _GROUNDS_LIST = "\n".join(f"  - {g}" for g in ART106_GROUNDS)
 _SANCTION_LIST = "\n".join(f"  - {s}" for s in SANCTION_TYPES)
@@ -157,7 +160,25 @@ def already_processed(conn: sqlite3.Connection, filename: str) -> bool:
     return row is not None
 
 
-def extract_file(client: anthropic.Anthropic, md_path: Path, stage_14) -> dict:
+def reviews_a_decision(md_path: Path) -> bool:
+    """Does this ВРП act actually review a disciplinary-palate decision?
+
+    The act number (`…/0/15-…`) says the ВРП issued it, but not what about. The
+    ВРП also refuses ВККСУ подання про звільнення, rules on complaints against its
+    own disciplinary inspectors, and approves висновки про заходи щодо забезпечення
+    незалежності суддів. None of those review a palate decision, and none of them
+    quote a palate decision number — which is exactly the test.
+
+    Three of the eleven acts in the first batch were of this kind. They cost an API
+    call each and returned a record with a null join key, so they could never be
+    attached to anything. Checking before the call is free: the rule reads the same
+    text the model would have been given.
+    """
+    return bool(act_numbers.find_reviewed_decision_numbers(md_path.read_text(encoding="utf-8")))
+
+
+def extract_file(client: anthropic.Anthropic, md_path: Path, stage_14,
+                 model: str = MODEL) -> dict:
     review_text = md_path.read_text(encoding="utf-8")
 
     # Both join keys are chosen from what the rules found in THIS act, never typed.
@@ -167,18 +188,17 @@ def extract_file(client: anthropic.Anthropic, md_path: Path, stage_14) -> dict:
         with_complaint_candidates(REVIEW_SCHEMA, complaints), reviewed
     )
 
-    if len(review_text) > MAX_CHARS:
-        review_text = review_text[:MAX_CHARS] + "\n\n[текст скорочено]"
+    # Head *and* tail: the review's outcome is stated in the last paragraph.
+    review_text = clip_for_model(review_text, MAX_CHARS)
 
     message = client.messages.create(
-        model=MODEL,
+        model=model,
         max_tokens=MAX_TOKENS,
         thinking={"type": "adaptive"},
-        system=[{
-            "type": "text",
-            "text": SYSTEM_PROMPT,
-            "cache_control": {"type": "ephemeral"},
-        }],
+        # No cache_control — see stage 22 for the measurement. The per-act schema
+        # sits in the cached prefix and changes every call, so the cache never
+        # read back and only charged the 1.25× write premium.
+        system=SYSTEM_PROMPT,
         output_config={"format": {"type": "json_schema", "schema": schema}},
         messages=[{"role": "user",
                    "content": USER_PROMPT_TEMPLATE.format(review_text=review_text)}],
@@ -197,7 +217,8 @@ def extract_file(client: anthropic.Anthropic, md_path: Path, stage_14) -> dict:
     # was choosing between.
     result["complaint_number_candidates"] = complaints
     result["reviewed_decision_candidates"] = reviewed
-    return result
+    # The message travels with the record so the runner can bank its token usage.
+    return result, message
 
 
 def main():
@@ -206,6 +227,16 @@ def main():
     ap.add_argument("--limit", type=int,
                     help="process at most N not-yet-extracted reviews, newest first")
     ap.add_argument("--register", type=Path, default=REGISTER_PATH)
+    # A different model writes to a different database. Overwriting the rows in
+    # place would destroy the baseline the comparison exists to measure against.
+    ap.add_argument("--model", default=MODEL, help=f"extraction model (default {MODEL})")
+    ap.add_argument("--db", type=Path, default=DB_PATH,
+                    help="SQLite file to write to (default the pipeline database)")
+    ap.add_argument("--only", nargs="+", metavar="STEM",
+                    help="extract only these acts (e.g. 617_08.04.2026) — used to "
+                         "backfill a whole case rather than a recent window")
+    ap.add_argument("--workers", type=int, default=6,
+                    help="concurrent API calls (default 6); lower it if you see 429s")
     args = ap.parse_args()
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -214,49 +245,22 @@ def main():
 
     stage_14 = load_stage_14()
     md_files = register.markdown_files(
-        args.markdown_dir, register.stems(args.register, is_review)
+        args.markdown_dir, register.stems(args.register, is_review), args.only
     )
     print(f"Found {len(md_files)} рішень ВРП про перегляд in {args.markdown_dir}"
           f" (newest first)")
 
-    client = anthropic.Anthropic(api_key=api_key)
-    done = 0
-    with sqlite3.connect(DB_PATH) as conn:
-        init_db(conn)
-        for i, md_path in enumerate(md_files, 1):
-            if args.limit and done >= args.limit:
-                break
-            filename = md_path.stem
-            print(f"[{i}/{len(md_files)}] {filename} ... ", end="", flush=True)
-
-            if already_processed(conn, filename):
-                print("skipped (already done)")
-                continue
-
-            try:
-                data = extract_file(client, md_path, stage_14)
-                conn.execute(
-                    """INSERT INTO reviews (filename, data, processed_at, error)
-                       VALUES (?, ?, datetime('now'), NULL)
-                       ON CONFLICT(filename) DO UPDATE SET
-                           data=excluded.data, processed_at=datetime('now'), error=NULL""",
-                    (filename, json.dumps(data, ensure_ascii=False)),
-                )
-                conn.commit()
-                done += 1
-                print("done")
-            except Exception as e:
-                print(f"ERROR: {e}")
-                conn.execute(
-                    """INSERT INTO reviews (filename, error) VALUES (?, ?)
-                       ON CONFLICT(filename) DO UPDATE SET error=excluded.error""",
-                    (filename, str(e)),
-                )
-                conn.commit()
-
-            time.sleep(1)
-
-    print(f"\nDone. Database: {DB_PATH}")
+    # More retries than the SDK default: an 862-act run will meet a 429 or an
+    # overloaded response eventually, and losing an act to one is pure waste.
+    client = anthropic.Anthropic(api_key=api_key, max_retries=8)
+    extract_runner.run(
+        md_files, "reviews",
+        lambda p: extract_file(client, p, stage_14, args.model),
+        model=args.model, db_path=args.db, limit=args.limit,
+        workers=args.workers, label="рішень ВРП",
+        precheck=lambda p: None if reviews_a_decision(p) else
+            'ВРП акт, але не переглядає рішення палати',
+    )
 
 
 if __name__ == "__main__":

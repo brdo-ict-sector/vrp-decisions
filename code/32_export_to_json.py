@@ -28,6 +28,7 @@ from pathlib import Path
 import openpyxl
 
 import act_numbers
+import joins
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "decisions.db"
@@ -103,6 +104,13 @@ def main():
             "SELECT filename, data, processed_at FROM decisions "
             "WHERE data IS NOT NULL ORDER BY filename"
         ).fetchall()
+        # Rulings and reviews are never exported in their own right: an ухвала that
+        # is not attached to a decision has no card of its own on the site, because
+        # "a case was opened" is not yet an answer to anything.
+        rulings = {r["filename"]: json.loads(r["data"])
+                   for r in conn.execute("SELECT filename, data FROM rulings WHERE data IS NOT NULL")}
+        reviews = {r["filename"]: json.loads(r["data"])
+                   for r in conn.execute("SELECT filename, data FROM reviews WHERE data IS NOT NULL")}
 
     def stage_grounds(qual: dict, stage: str) -> list:
         s = (qual or {}).get(stage)
@@ -152,6 +160,66 @@ def main():
 
         judges = flatten_judges(data)
         lead_judge = judges[0] if judges else {}
+
+        # ── Related acts ────────────────────────────────────────────────────
+        ruling_hit = joins.find_ruling(data, filename, rulings)
+        review_hit = joins.find_review(data, reviews)
+
+        def related_act(hit: dict, num_key: str) -> dict | None:
+            """Act-level facts about a related act, plus how the link was made."""
+            if not hit:
+                return None
+            rec, rel_link = hit["record"], register.get(hit["filename"], {})
+            return {
+                "filename": hit["filename"],
+                "num": rec.get(num_key) or rel_link.get("decision_num"),
+                "date": rec.get("date"),
+                "url": rel_link.get("url"),
+                # R7: a provisional link must be visibly provisional.
+                "matched_on": hit["matched_on"],
+                "method": hit["method"],
+                "other_candidates": hit.get("other_candidates", 0),
+            }
+
+        ruling_out = related_act(ruling_hit, "ruling_num")
+        if ruling_out:
+            rec = ruling_hit["record"]
+            ruling_out.update({
+                "complaint_number": rec.get("complaint_number"),
+                "complaint_date": rec.get("complaint_date"),
+                "complainant_name": rec.get("complainant_name"),
+                "complainant_type": rec.get("complainant_type"),
+                "inspector": rec.get("inspector"),
+                "inspector_proposal": rec.get("inspector_proposal"),
+                "facts": (rec.get("summary") or {}).get("facts"),
+            })
+        review_out = related_act(review_hit, "review_num")
+        if review_out:
+            rec = review_hit["record"]
+            review_out.update({
+                "appellant_type": rec.get("appellant_type"),
+                "appellant_name": rec.get("appellant_name"),
+                "essence": (rec.get("summary") or {}).get("essence"),
+            })
+
+        # Per judge, from that judge's OWN entry in the related act — an ухвала
+        # opens different grounds against different judges, so taking the first
+        # entry would attribute one judge's grounds to another.
+        for j in judges:
+            rj = joins.judge_view(ruling_hit["record"], j.get("name")) if ruling_hit else None
+            j["ruling"] = {
+                "grounds": (rj.get("grounds") or {}),
+                "outcome": rj.get("outcome"),
+                "judge_position": rj.get("judge_position"),
+            } if rj else None
+            vj = joins.judge_view(review_hit["record"], j.get("name")) if review_hit else None
+            j["review"] = {
+                "review_outcome": vj.get("review_outcome"),
+                "qualification": vj.get("qualification") or {},
+                # R5: where a review exists, the sanction in force is the review's.
+                "sanction": vj.get("sanction"),
+                "sanction_type": vj.get("sanction_type"),
+            } if vj else None
         qual = lead_judge.get("qualification") or {}
         # Flat ground list for the facet filter: the palate's qualification, else
         # what the complaint alleged.
@@ -169,6 +237,14 @@ def main():
             "judge_name": lead_judge.get("name"),
             "court": lead_judge.get("court"),
             "judges": judges,
+            # Every judge and court the act names, so the facets can filter on a
+            # co-defendant rather than only on whoever happens to be listed first.
+            "judge_names": [j["name"] for j in judges if j.get("name")],
+            "courts": sorted({j["court"] for j in judges if j.get("court")}),
+            # The two related acts, or null. An ухвала with no decision is not
+            # exported at all — it appears here or nowhere.
+            "ruling": ruling_out,
+            "review": review_out,
             # Stated by the act number, not guessed by the model.
             "chamber": act_numbers.chamber_of(link.get("decision_num")) or data.get("chamber"),
             "art106_grounds": grounds,
@@ -183,7 +259,14 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(decisions, ensure_ascii=False, indent=2), encoding="utf-8")
     linked = sum(1 for d in decisions if d["url"])
+    with_ruling = sum(1 for d in decisions if d["ruling"])
+    with_review = sum(1 for d in decisions if d["review"])
     print(f"Exported {len(decisions)} decisions ({linked} with source links) → {args.output}")
+    # R8: silence is indistinguishable from a bug, so the joins are always counted.
+    print(f"  ухвала attached: {with_ruling}/{len(decisions)}"
+          f"   ВРП перегляд attached: {with_review}/{len(decisions)}")
+    orphan_rulings = len(rulings) - len({d["ruling"]["filename"] for d in decisions if d["ruling"]})
+    print(f"  ухвал extracted but not attached to any decision (not exported): {orphan_rulings}")
 
 
 if __name__ == "__main__":

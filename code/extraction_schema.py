@@ -484,6 +484,37 @@ def enforce_no_candidates(result: dict, candidates: list[str]) -> dict:
 UNION_LIMIT = 16
 
 
+
+def clip_for_model(text: str, max_chars: int, head_share: float = 0.65) -> str:
+    """Fit an act into the context window without losing its operative part.
+
+    Cutting the tail is the obvious way to shorten a document and the wrong one
+    here. A ВРП act states its outcome last: «вирішила: … застосувати … стягнення
+    у виді подання про звільнення судді з посади» is the final paragraph. In act
+    617/2дп/15-26 that paragraph begins at character 184 572 of 185 491 — inside
+    the last half-percent — so a head-only clip at 160 000 removed the sanction
+    and nothing else of consequence. The model reported the operative part as
+    missing, which was true of what it was shown, and the record came back with a
+    null sanction for a judge the palate had moved to dismiss.
+
+    So keep both ends: the head carries the parties, complaint numbers and the
+    grounds argued, the tail carries what was decided.
+
+    At the current limit (500 000 chars against a largest act of ~430 000) nothing
+    in the corpus is clipped at all, and that is the intent — the whole act goes to
+    the model. This stays as a guard for an act longer than any we have yet seen,
+    so that if the limit ever binds again it takes the middle rather than the
+    outcome.
+    """
+    if len(text) <= max_chars:
+        return text
+    head = int(max_chars * head_share)
+    tail = max_chars - head
+    return (text[:head]
+            + "\n\n[…пропущено середину тексту…]\n\n"
+            + text[-tail:])
+
+
 def count_union_params(schema: dict) -> int:
     """Number of union-typed (anyOf) parameters anywhere in a schema.
 

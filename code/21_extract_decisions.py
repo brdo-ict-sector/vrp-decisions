@@ -39,12 +39,14 @@ from pathlib import Path
 import anthropic
 
 import act_numbers
+import extract_runner
 import register
 from extraction_schema import (
     ART106_GROUNDS,
     DECISION_SCHEMA,
     SANCTION_TYPES,
     STRUCTURE_KEYS,
+    clip_for_model,
     enforce_no_candidates,
     with_complaint_candidates,
 )
@@ -55,9 +57,10 @@ MARKDOWN_DIR = BASE_DIR / "data" / "acts" / "md"
 REGISTER_PATH = BASE_DIR / "data" / "register" / "hcj_acts_selected.xlsx"
 DB_PATH = BASE_DIR / "data" / "decisions.db"
 
-MODEL = "claude-opus-5"
+MODEL = "claude-sonnet-5"  # A/B tested against Opus 5 on 20 acts: 96.6% agreement on
+                          # structured fields, no judge-identity differences, ~40% cheaper.
 MAX_TOKENS = 16000  # caps thinking + response together — leave the model room
-MAX_CHARS = 160_000  # truncate very long decisions to stay within context
+MAX_CHARS = 500_000  # the whole act: the largest in the corpus is ~430k chars
 
 _GROUNDS_LIST = "\n".join(f"  - {g}" for g in ART106_GROUNDS)
 _SANCTION_LIST = "\n".join(f"  - {s}" for s in SANCTION_TYPES)
@@ -144,7 +147,8 @@ def load_stage_14():
     return module
 
 
-def extract_file(client: anthropic.Anthropic, md_path: Path, stage_14) -> dict:
+def extract_file(client: anthropic.Anthropic, md_path: Path, stage_14,
+                 model: str = MODEL) -> dict:
     decision_text = md_path.read_text(encoding="utf-8")
 
     # Constrain the complaint-number fields to what stage 14 found in THIS act, so the
@@ -152,11 +156,11 @@ def extract_file(client: anthropic.Anthropic, md_path: Path, stage_14) -> dict:
     candidates = stage_14.accepted_numbers(stage_14.find_numbers(decision_text))
     schema = with_complaint_candidates(DECISION_SCHEMA, candidates)
 
-    if len(decision_text) > MAX_CHARS:
-        decision_text = decision_text[:MAX_CHARS] + "\n\n[текст скорочено]"
+    # Head *and* tail: the sanction is in the last paragraph of the act.
+    decision_text = clip_for_model(decision_text, MAX_CHARS)
 
     message = client.messages.create(
-        model=MODEL,
+        model=model,
         max_tokens=MAX_TOKENS,
         thinking={"type": "adaptive"},
         system=SYSTEM_PROMPT,
@@ -175,7 +179,8 @@ def extract_file(client: anthropic.Anthropic, md_path: Path, stage_14) -> dict:
         {k: data.get(k) for k in (*STRUCTURE_KEYS, "related_complaint_numbers")}, candidates
     )
     result["complaint_number_candidates"] = candidates
-    return result
+    # The message travels with the record so the runner can bank its token usage.
+    return result, message
 
 
 def is_decision(record: dict) -> bool:
@@ -198,58 +203,38 @@ def main():
     ap.add_argument("--limit", type=int,
                     help="process at most N not-yet-extracted decisions, newest first")
     ap.add_argument("--register", type=Path, default=REGISTER_PATH)
+    # A different model writes to a different database. Overwriting the rows in
+    # place would destroy the baseline the comparison exists to measure against.
+    ap.add_argument("--model", default=MODEL, help=f"extraction model (default {MODEL})")
+    ap.add_argument("--db", type=Path, default=DB_PATH,
+                    help="SQLite file to write to (default the pipeline database)")
+    ap.add_argument("--only", nargs="+", metavar="STEM",
+                    help="extract only these acts (e.g. 617_08.04.2026) — used to "
+                         "backfill a whole case rather than a recent window")
+    ap.add_argument("--workers", type=int, default=6,
+                    help="concurrent API calls (default 6); lower it if you see 429s")
     args = ap.parse_args()
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise SystemExit("ERROR: ANTHROPIC_API_KEY environment variable not set")
 
-    client = anthropic.Anthropic(api_key=api_key)
     stage_14 = load_stage_14()
     md_files = register.markdown_files(
-        args.markdown_dir, register.stems(args.register, is_decision)
+        args.markdown_dir, register.stems(args.register, is_decision), args.only
     )
     print(f"Found {len(md_files)} рішень дисциплінарних палат in {args.markdown_dir}"
           f" (newest first)")
 
-    done = 0
-    with sqlite3.connect(DB_PATH) as conn:
-        init_db(conn)
-        for i, md_path in enumerate(md_files, 1):
-            if args.limit and done >= args.limit:
-                break
-            filename = md_path.stem
-            print(f"[{i}/{len(md_files)}] {filename} ... ", end="", flush=True)
-
-            if already_processed(conn, filename):
-                print("skipped (already done)")
-                continue
-
-            try:
-                data = extract_file(client, md_path, stage_14)
-                conn.execute(
-                    """INSERT INTO decisions (filename, data, processed_at, error)
-                       VALUES (?, ?, datetime('now'), NULL)
-                       ON CONFLICT(filename) DO UPDATE SET
-                           data=excluded.data, processed_at=datetime('now'), error=NULL""",
-                    (filename, json.dumps(data, ensure_ascii=False)),
-                )
-                conn.commit()
-                done += 1
-                print("done")
-            except Exception as e:
-                print(f"ERROR: {e}")
-                conn.execute(
-                    """INSERT INTO decisions (filename, error) VALUES (?, ?)
-                       ON CONFLICT(filename) DO UPDATE SET error=excluded.error""",
-                    (filename, str(e)),
-                )
-                conn.commit()
-
-            if i < len(md_files):
-                time.sleep(1)
-
-    print(f"\nDone. Database: {DB_PATH}")
+    # More retries than the SDK default: an 862-act run will meet a 429 or an
+    # overloaded response eventually, and losing an act to one is pure waste.
+    client = anthropic.Anthropic(api_key=api_key, max_retries=8)
+    extract_runner.run(
+        md_files, "decisions",
+        lambda p: extract_file(client, p, stage_14, args.model),
+        model=args.model, db_path=args.db, limit=args.limit,
+        workers=args.workers, label="рішень ДП",
+    )
 
 
 if __name__ == "__main__":
