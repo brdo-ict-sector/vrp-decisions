@@ -1,8 +1,9 @@
 # Product Mission
 
-> Last updated: 2026-06-02
+> Last updated: 2026-07-29
 > Status: Active
 > Source: derived from [00_stakeholder_requirements.md](./00_stakeholder_requirements.md)
+> Downstream: [02_tech_stack.md](./02_tech_stack.md), [03_roadmap.md](./03_roadmap.md)
 
 ## Pitch
 
@@ -48,8 +49,8 @@ systematize and review (узагальнення) ВРП practice.
 Producing the узагальнення requires experts to read long disciplinary decisions and
 manually draft the фабула, суть, and key conclusions, while also extracting structured
 facts (judge, court, qualification, conduct, sanction) for each decision — at every stage
-of the ДП→ВРП chain. This is a major drain on scarce expert time and does not scale to the
-full corpus of 600+ decisions.
+of the ДП→ВРП chain. This is a major drain on scarce expert time and does not scale to a corpus
+of 935 acts for 2025–2026 alone.
 
 **Our Solution:** AI drafts the structured preprocessing for every decision according to a
 fixed schema; an expert then verifies and corrects it before it becomes authoritative.
@@ -63,23 +64,50 @@ fixed schema; an expert then verifies and corrects it before it becomes authorit
   complaint, ДП, and ВРП stages.
 - **Plain-language AI summaries.** Concise фабула / суть / ключові висновки and a summary
   of the судді's assessed conduct, instead of long legal texts.
-- **Full ДП→ВРП chain linked.** Each disciplinary chamber decision is connected to its ВРП
-  review decision where one exists, showing the complete accountability outcome.
+- **The whole proceeding, not the loose act.** A disciplinary proceeding is up to three
+  documents, published separately and numbered independently: the **ухвала** that opens it, the
+  **рішення** of the palate that decides it, and the **рішення ВРП** that may review that. They
+  are assembled per judge and per complaint, so one record shows what was complained of, what
+  the palate agreed to open on, what the judge was actually held liable for, what sanction
+  followed, and whether it survived review.
+  *(Planned — phase 3; see [04_spec_proceedings.md](./04_spec_proceedings.md).)*
 - **Expert-verified and citable.** AI is the drafter, a human is the verifier; every record
   carries an interactive link to the original decision.
 
 ## Key Features
 
-### Structured Extraction (per decision)
+### Structured Extraction (per рішення дисциплінарної палати)
+Recorded **per judge**: one decision can punish one judge and refuse to punish another.
 - Decision metadata: date, disciplinary chamber (ДП), decision number, and the official
   short title (short_name)
-- Judge's full name (ПІП) under review
-- Court where the judge works
+- Each judge's full name (ПІП), court, and position
 - Interactive link to the source decision
-- Qualification of the act under Art. 106 — at the complaint, ДП decision, and ВРП review,
-  drawn from a controlled vocabulary (a fixed enum of Art. 106 grounds) for consistent filtering
-- Summary of the судді's assessed conduct — at the complaint, ДП decision, and ВРП review
-- Sanction (стягнення) — at the ДП decision and ВРП review
+- Qualification of the act under Art. 106 — at the complaint and at the ДП decision, drawn from
+  a controlled vocabulary (a fixed enum of Art. 106 grounds) for consistent filtering
+- Summary of the судді's assessed conduct — at the complaint and at the ДП decision
+- Sanction (стягнення) per judge, both in the act's own wording and normalized to the Art. 109
+  vocabulary, so догана and сувора догана never blur together
+
+### Structured Extraction (per ухвала про відкриття справи)
+The opening act is not a smaller decision — it holds the front half of the case:
+- Grounds at **three** stages: what the complainant **requested**, what the palate actually
+  **opened** on, and what it expressly **rejected** — the narrowing between them is the finding
+- Who complained (name, organization, and a type drawn from a controlled vocabulary)
+- The disciplinary inspector and what they proposed — a palate overriding its inspector is a
+  meaningful accountability signal
+- The panel, the underlying court case, and the complaint's arrival date
+
+### Structured Extraction (per рішення ВРП про перегляд)
+The second instance, and its own act type:
+- Which palate decision is under review, and who took it there — a judge contesting a sanction
+  and a complainant contesting a refusal are opposite situations
+- Per judge: what the ВРП did with the decision, and the sanction **in force after review**
+
+### Proceeding Assembly
+- Ухвала, рішення and ВРП review assembled into one record per **proceeding** — one judge, one
+  complaint — so a reader follows a complaint from filing to final outcome
+- The comparison that only the assembly can produce: **по чому відкрилися vs по чому реально
+  було притягнуто**
 
 ### AI Summarization
 - Concise фабула, суть рішення, and ключові висновки of the disciplinary chambers,
@@ -100,8 +128,9 @@ fixed schema; an expert then verifies and corrects it before it becomes authorit
 - **Expert time saved** — sharp reduction in the effort to preprocess each decision vs. the
   fully manual process.
 
-Scale: the MVP targets ~30 decisions to validate the approach; the full application is
-intended to operate over the complete corpus of 600+ ДП+ВРП decisions.
+Scale: the MVP targeted ~30 decisions to validate the approach. The register has since defined
+the real corpus — **935 disciplinary acts for 2025–2026** (450 рішення + 485 ухвали про
+відкриття справи) — and earlier years are still to be backfilled.
 
 ## Vision
 

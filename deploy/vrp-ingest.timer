@@ -1,0 +1,16 @@
+[Unit]
+Description=Run the VRP register ingest daily at 02:00 Kyiv time
+
+[Timer]
+# The host runs on UTC; the zone suffix (systemd 252+) keeps the job at 02:00
+# Kyiv time across the DST switch instead of drifting an hour twice a year —
+# 23:00 UTC in summer, 00:00 UTC in winter.
+OnCalendar=*-*-* 02:00:00 Europe/Kyiv
+# If the machine was off at 02:00, catch up once it is back.
+Persistent=true
+# Be polite to hcj.gov.ua — do not hit it at the same second every night.
+RandomizedDelaySec=300
+Unit=vrp-ingest.service
+
+[Install]
+WantedBy=timers.target

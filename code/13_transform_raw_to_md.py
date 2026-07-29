@@ -5,9 +5,12 @@ Convert raw decision files (.docx, .doc, .rtf) into Markdown.
 - .doc / .rtf are first converted to .docx with headless LibreOffice
   (Docling does not ingest legacy .doc / .rtf), then run through Docling.
 
+Already-converted files are skipped, so a nightly run only touches the acts
+stage 12 has just downloaded.
+
 Usage:
-    python 01_transform_raw_to_md.py                 # round2 defaults
-    python 01_transform_raw_to_md.py <input> <output>
+    python 13_transform_raw_to_md.py                 # data/acts/raw → data/acts/md
+    python 13_transform_raw_to_md.py <input> <output>
 """
 
 import shutil
@@ -20,8 +23,8 @@ from docling.document_converter import DocumentConverter
 
 # ── Config ──────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
-INPUT_DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else BASE_DIR / "data" / "round2" / "raw_data"
-OUTPUT_DIR = Path(sys.argv[2]) if len(sys.argv) > 2 else BASE_DIR / "data" / "round2" / "md"
+INPUT_DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else BASE_DIR / "data" / "acts" / "raw"
+OUTPUT_DIR = Path(sys.argv[2]) if len(sys.argv) > 2 else BASE_DIR / "data" / "acts" / "md"
 
 SUPPORTED = {".docx", ".doc", ".rtf"}
 LEGACY = {".doc", ".rtf"}  # need LibreOffice → .docx first

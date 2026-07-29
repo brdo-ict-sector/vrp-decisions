@@ -1,0 +1,17 @@
+[Unit]
+Description=VRP register ingest (scrape HCJ acts, download, convert to Markdown)
+Documentation=file:/home/ubuntu/vrp-ai-sandbox/constitution/02_tech_stack.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/vrp-ai-sandbox
+ExecStart=/home/ubuntu/vrp-ai-sandbox/code/run_daily.sh
+# Converting a large backlog with LibreOffice + Docling is slow; the lock in
+# run_daily.sh already prevents overlapping runs.
+TimeoutStartSec=8h
+# Ingest is background work — never let it starve an interactive session.
+Nice=10

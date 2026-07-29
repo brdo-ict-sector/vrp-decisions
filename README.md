@@ -42,24 +42,44 @@ systematize and review (узагальнення) VRP disciplinary practice.
 
 ## How it works
 
-The project is a small data pipeline plus a static web app:
+The project is a small data pipeline plus a static web app. The pipeline has three
+phases:
 
-1. **Convert** — original decisions (`.docx` / `.doc` / `.rtf`) are converted to
-   clean Markdown text.
-2. **Summarize** — each decision is sent to the Claude API, which extracts the
-   fields above against a fixed schema and writes them to a local database.
-3. **Publish** — the records are exported to JSON, joined with source-document
-   links, and served by a single-page web app (filter by chamber, Article 106
-   grounds, and more).
+**1. Ingestion** — the official register at `hcj.gov.ua/acts` is scraped into an
+index of what documents exist; the disciplinary acts are picked out of it (every
+*рішення*, plus the *ухвали* that open a disciplinary case) and downloaded; the
+originals (`.docx` / `.doc` / `.rtf`) are converted to clean Markdown; and the
+complaint number is read out of each act by a plain rule, because it is the key
+that later joins the two halves of a case.
 
-The current dataset covers **32 first-instance disciplinary decisions** as a
-working sample; the full corpus is 600+ decisions.
+**2. Extraction** — each act is sent to the Claude API, which fills in a fixed
+schema and writes the result to a local database. Decisions and opening rulings
+have separate schemas: a ruling records what was *asked for* and what the chamber
+agreed to *open* on, a decision records what the judge was actually held liable
+for and the sanction.
+
+**3. Merge** — the two are joined on the complaint number into one record per
+case, exported to JSON, and served by a single-page web app (filter by chamber,
+Article 106 grounds, sanction, and more).
+
+Ingestion runs **automatically every night at 02:00 Kyiv time**, so newly
+published acts are collected without anyone doing anything. Extraction and
+publishing stay manual: the AI output is a draft, and a human decides when it is
+ready to go on the site.
+
+**Current state:** ingestion is complete and running — **935** disciplinary acts
+for 2025–2026 (450 decisions + 485 opening rulings) are downloaded and converted.
+Extraction has so far covered a **32-decision working sample**, which is what the
+published dataset contains; the rest is queued. The merge phase is specified but
+not yet built. Earlier years are still to be backfilled.
 
 ## Project layout
 
-- `code/` — the three-stage pipeline (convert → summarize → export)
+- `code/` — the pipeline, numbered by phase (`1x` ingestion, `2x` extraction,
+  `3x` merge)
+- `deploy/` — the systemd timer that runs the nightly ingestion
 - `constitution/` — the project specification: stakeholder requirements, mission,
-  tech stack, and roadmap
+  tech stack, roadmap, and per-phase specs
 - `docs/` — the published web app (`index.html`) and data (`decisions.json`)
 
 Source documents, the local database, and credentials are intentionally **not**

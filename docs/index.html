@@ -271,21 +271,46 @@
 
   const SANCTION_KINDS = [
     ['Звільнення',            /звільн|подання про звільнення/i],
-    ['Сувора догана',         /сувор\w* доган/i],
+    // \p{L}, not \w: \w is [A-Za-z0-9_] and cannot match the Cyrillic ending of
+    // «Сувора», so this pattern silently failed and every сувора догана fell
+    // through to the «Догана» bucket below.
+    ['Сувора догана',         /сувор\p{L}*\s+доган/iu],
     ['Догана',                /доган/i],
     ['Попередження',          /попередженн/i],
     ['Відмовлено у притягненні', /відмов/i],
   ];
 
+  // Normalized sanction type, extracted per ст. 109, is authoritative when present.
+  // The regex over free text remains only for records extracted before that field
+  // existed, and mis-buckets in ways the enum cannot — «звільнено ВІД
+  // відповідальності» reads as «Звільнення», its opposite.
+  const SANCTION_LABELS = {
+    'попередження': 'Попередження',
+    'догана': 'Догана',
+    'сувора догана': 'Сувора догана',
+    'подання про звільнення судді з посади': 'Звільнення',
+    'стягнення не накладено': 'Стягнення не накладено',
+  };
+
+  function leadJudge(d) {
+    return (d.judges && d.judges[0]) || {};
+  }
+
   function sanctionKind(d) {
-    const t = ((d.sanction && (d.sanction.vrp || d.sanction.dp)) || '').toString();
+    const type = d.sanction_type || leadJudge(d).sanction_type;
+    if (type) return SANCTION_LABELS[type] || type;
+    const s = d.sanction != null ? d.sanction : leadJudge(d).sanction;
+    const t = (typeof s === 'string' ? s : (s && (s.vrp || s.dp)) || '').toString();
     for (const [label, re] of SANCTION_KINDS) if (re.test(t)) return label;
     return t.trim() ? 'Інше' : '—';
   }
 
+  // A ВРП review is its own act; until phase 3 links it, `d.review` is absent and
+  // every record here is first-instance. The legacy q.vrp / c.vrp checks stay for
+  // records extracted under the old schema.
   function hasVrp(d) {
-    const q = d.qualification || {}, s = d.sanction || {}, c = d.conduct || {};
-    return !!(q.vrp || s.vrp || c.vrp);
+    const q = d.qualification || {}, c = d.conduct || {};
+    return !!(d.review || q.vrp || c.vrp);
   }
 
   const chamberLabel = d => d.chamber ? d.chamber + ' ДП' : '';
@@ -350,6 +375,23 @@
     </div>`;
   }
 
+  // Стягнення is per judge: one decision can punish one judge and refuse to
+  // punish another, so a single act-level value would have to discard one of them.
+  function sanctionBlock(judges) {
+    const rows = judges.map(j => {
+      const type = j.sanction_type ? `<span class="tag sanction">${esc(SANCTION_LABELS[j.sanction_type] || j.sanction_type)}</span>` : '';
+      const text = j.sanction ? esc(j.sanction) : '—';
+      const who = judges.length > 1 && j.name ? `<div class="stage-name">${esc(j.name)}</div>` : '';
+      return `<div class="stage-col">${who}
+        <div class="stage-val ${j.sanction ? '' : 'empty'}">${type}${type ? '<br>' : ''}${text}</div>
+      </div>`;
+    }).join('');
+    return `<div class="field">
+      <div class="field-label">Стягнення</div>
+      <div class="stages">${rows}</div>
+    </div>`;
+  }
+
   function cardHtml(d, idx) {
     const concl = (d.summary && d.summary.conclusions) || [];
     const conclHtml = Array.isArray(concl) && concl.length
@@ -372,7 +414,10 @@
       d.court,
     ].filter(Boolean).map(esc).join(' · ');
 
-    const qStages = [['complaint','Скарга'],['dp','Дисциплінарна палата'],['vrp','Перегляд від ВРП']];
+    // A ВРП review is a separate act, not a stage of this one, so there is no
+    // third column to fill here.
+    const qStages = [['complaint','Скарга'],['dp','Дисциплінарна палата']];
+    const judges = (d.judges && d.judges.length) ? d.judges : [leadJudge(d)];
 
     return `<div class="card" data-idx="${idx}">
       <div class="card-head" onclick="toggle(${idx})">
@@ -400,7 +445,7 @@
         </div>
         ${qualBlock('Кваліфікація діяння за ст. 106', d.qualification, qStages)}
         ${stageBlock('Поведінка судді - резюме', d.conduct, qStages)}
-        ${stageBlock('Стягнення', d.sanction, [['dp','Дисциплінарна палата'],['vrp','Перегляд від ВРП']])}
+        ${sanctionBlock(judges)}
         ${link}
       </div>
     </div>`;
