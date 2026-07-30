@@ -150,9 +150,3 @@ SKIP_PUBLISH=1 code/run_daily.sh   # everything except the push
 ```
 
 Extraction needs `ANTHROPIC_API_KEY` in a `.env` file at the repository root.
-
----
-
-*This is a sandbox / proof-of-concept. Summaries are AI-generated drafts and have
-not yet been verified by a human expert; always consult the linked original
-decision as the authoritative source.*

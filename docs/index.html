@@ -98,6 +98,7 @@
       color: var(--text); outline: none;
     }
     .facet select:focus, .facet input:focus { border-color: var(--blue); }
+    .date-range { display: flex; flex-direction: column; gap: .3rem; }
     .reset-btn {
       width: 100%; padding: .5rem; margin-top: .25rem; border: 1px solid var(--border);
       border-radius: 8px; background: var(--bg); color: var(--muted);
@@ -332,6 +333,15 @@
         <datalist id="judgeList"></datalist>
       </div>
       <div class="facet">
+        <div class="facet-title">Дата рішення</div>
+        <!-- Bounds come from the data at the low end and from today at the high
+             end, so the picker can never offer a range the corpus cannot hold. -->
+        <div class="date-range">
+          <input type="date" id="filterDateFrom" aria-label="Дата рішення від" />
+          <input type="date" id="filterDateTo" aria-label="Дата рішення до" />
+        </div>
+      </div>
+      <div class="facet">
         <div class="facet-title">Суд</div>
         <select id="filterCourt"><option value="">Усі суди</option></select>
       </div>
@@ -399,6 +409,17 @@
     'подання про тимчасове відсторонення від здійснення правосуддя': 'Тимчасове відсторонення',
     'стягнення не накладено': 'Стягнення не накладено',
   };
+
+  // Dates arrive as DD.MM.YYYY. Rebuilt into YYYY-MM-DD from the parts rather
+  // than through Date(), which would drag the browser's timezone into a value
+  // that is a calendar date and has no time of day: parsing "27.05.2026" west of
+  // UTC and formatting it back can land on the 26th.
+  // ISO strings also sort and compare correctly as plain strings, which is all
+  // the sort and the range filter need.
+  function isoDate(s) {
+    const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(String(s || '').trim());
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+  }
 
   function leadJudge(d) {
     return (d.judges && d.judges[0]) || {};
@@ -487,6 +508,24 @@
     fillSelect($('filterGround'), [...grounds], compareGrounds);
     fillSelect($('filterSanction'), [...sanctions]);
     fillSelect($('filterChamber'), [...chambers]);
+    initDateBounds();
+  }
+
+  // Oldest decision in the corpus at the low end, today at the high end. Both
+  // fields are pre-filled with those bounds, so the control states the range the
+  // data actually spans instead of leaving the reader to discover it.
+  function initDateBounds() {
+    const dates = ALL.map(d => isoDate(d.date)).filter(Boolean).sort();
+    if (!dates.length) return;
+    const oldest = dates[0];
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+                + `-${String(now.getDate()).padStart(2, '0')}`;
+    for (const [id, val] of [['filterDateFrom', oldest], ['filterDateTo', today]]) {
+      const el = $(id);
+      el.min = oldest; el.max = today; el.value = val;
+      el.dataset.default = val;
+    }
   }
 
   // Free-text per-stage block (conduct, sanction).
@@ -767,6 +806,8 @@
   function applyFilters() {
     const q = $('searchInput').value.toLowerCase().trim();
     const j = $('filterJudge').value.trim();
+    const dFrom = $('filterDateFrom').value;
+    const dTo = $('filterDateTo').value;
     const c = $('filterCourt').value;
     const g = $('filterGround').value;
     const s = $('filterSanction').value;
@@ -777,6 +818,14 @@
     const jq = j.toLowerCase();
 
     const filtered = ALL.filter(d => {
+      if (dFrom || dTo) {
+        // A record with no readable date cannot be shown to satisfy a range, so
+        // it drops out rather than being waved through on a technicality.
+        const iso = isoDate(d.date);
+        if (!iso) return false;
+        if (dFrom && iso < dFrom) return false;
+        if (dTo && iso > dTo) return false;
+      }
       if (jq && !judgesOf(d).some(x => x && x.toLowerCase().includes(jq))) return false;
       if (c && !courtsOf(d).some(x => x && x.trim() === c)) return false;
       if (g && !(d.art106_grounds || []).some(x => x && x.trim() === g)) return false;
@@ -792,10 +841,11 @@
     // set that now has two pages shows an empty screen that reads as "no matches".
     render(filtered, 1);
     $('countBadge').textContent = filtered.length === ALL.length
-      ? `${ALL.length} рішень` : `Знайдено ${filtered.length} з ${ALL.length}`;
+      ? `рішень: ${ALL.length}` : `рішень: ${filtered.length} з ${ALL.length}`;
   }
 
-  ['searchInput','filterJudge','filterCourt','filterGround','filterSanction','filterChamber']
+  ['searchInput','filterJudge','filterCourt','filterGround','filterSanction','filterChamber',
+   'filterDateFrom','filterDateTo']
     .forEach(id => $(id).addEventListener('input', applyFilters));
   // Collapsible filters panel (mobile). Button is hidden on desktop via CSS.
   $('filtersToggle').addEventListener('click', () => {
@@ -811,7 +861,11 @@
 
   $('resetBtn').addEventListener('click', () => {
     $('searchInput').value = '';
-    ['filterJudge','filterCourt','filterGround','filterSanction','filterChamber'].forEach(id => $(id).value = '');
+    ['filterJudge','filterCourt','filterGround','filterSanction','filterChamber']
+      .forEach(id => $(id).value = '');
+    // The dates reset to the corpus bounds, not to empty — those bounds are the
+    // unfiltered state for this control.
+    ['filterDateFrom','filterDateTo'].forEach(id => $(id).value = $(id).dataset.default || '');
     applyFilters();
   });
 
@@ -833,10 +887,20 @@
   fetch('decisions.json')
     .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
     .then(data => {
-      ALL = data;
+      // Newest decision first. The export orders by filename, which is the act
+      // serial as a string — a reader opening the page expects the most recent
+      // practice, not act 1015 of some year. Undated records sort last rather
+      // than to the top, where an empty string would otherwise put them.
+      ALL = data.slice().sort((a, b) => {
+        const x = isoDate(a.date), y = isoDate(b.date);
+        if (!x && !y) return 0;
+        if (!x) return 1;
+        if (!y) return -1;
+        return y.localeCompare(x);
+      });
       buildFacets();
       render(ALL, 1);
-      $('countBadge').textContent = `${ALL.length} рішень`;
+      $('countBadge').textContent = `рішень: ${ALL.length}`;
     })
     .catch(err => {
       $('results').innerHTML =
