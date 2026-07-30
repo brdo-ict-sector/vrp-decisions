@@ -468,6 +468,34 @@ re-added nightly. It costs nothing — regex over local Markdown, no API.
 
 `SKIP_EXTRACT=1` and `SKIP_PUBLISH=1` turn the corresponding steps off for a manual run.
 
+### What happens when the API stops answering
+
+An exhausted credit balance is a 4xx, and the SDK does not retry 4xx — so it
+arrives instantly on every act rather than as a slow degradation. Before this was
+handled, that failure was silent in three places at once: the runner recorded a
+per-act error and returned normally, the stage exited 0, and the run went on to
+publish a day containing nothing while advancing the site's «Оновлено» date over
+it.
+
+The response is deliberately blunt: **when every act in a run fails, the whole
+pipeline halts** — ingest included — and writes `data/.halted`, which later runs
+check before doing anything.
+
+Halting the *scrape* is the part that matters. Extraction alone could be retried
+later; scraping cannot be undone, because stage 11 stamps «Вперше побачено» once
+and never re-stamps. Acts ingested during an outage would age past
+`--new-since-days` and be lost for good. Freezing everything bounds the loss to
+the handful of acts already ingested when it stopped, and the window widens on
+resume (measured from `data/.last-success`) to collect them.
+
+The honest date falls out of the same mechanism rather than needing its own
+guard: the stamp is written by stage 32, and a run that stops at stage 03 never
+reaches it.
+
+A *single* act failing is not a halt. That is a malformed source file or an
+overlong act — a gap to backfill, not an API to wait for. Only `written == 0 and
+failed > 0` trips it.
+
 ## What is deliberately *not* in the stack
 
 - **No server / database service in production.** Nothing to host beyond static files.

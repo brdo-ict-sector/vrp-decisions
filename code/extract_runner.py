@@ -113,7 +113,11 @@ def run(md_files, table, extract_fn, model, db_path, limit=None, workers=1,
     `budget` is a dollar ceiling on the **whole database**, not on this run:
     submission stops as soon as recorded spend reaches it, so a corpus run
     against a fixed pot of credit stops itself instead of failing on a 400.
-    Returns the number of records written.
+
+    Returns `(written, failed)`. The caller needs both to tell one bad act apart
+    from a dead API: an exhausted credit balance is a 4xx, which the SDK does not
+    retry, so it arrives instantly on every act and comes back as
+    `written == 0, failed == N`.
     """
     conn = sqlite3.connect(db_path)
     ensure_schema(conn, table)
@@ -128,10 +132,10 @@ def run(md_files, table, extract_fn, model, db_path, limit=None, workers=1,
         if prior >= budget:
             print("budget already exhausted — nothing submitted")
             conn.close()
-            return 0
+            return 0, 0
     if not todo:
         conn.close()
-        return 0
+        return 0, 0
 
     lock = threading.Lock()          # guards stdout only; SQLite stays single-threaded
     totals = {"in": 0, "out": 0, "cache_write": 0, "cache_read": 0}
@@ -220,7 +224,7 @@ def run(md_files, table, extract_fn, model, db_path, limit=None, workers=1,
     if halted:
         print("  stopped by --budget; re-run with a higher ceiling to continue")
     conn.close()
-    return done
+    return done, failed
 
 
 def summary(model, totals, done, failed, skipped, db_path) -> None:
@@ -232,6 +236,24 @@ def summary(model, totals, done, failed, skipped, db_path) -> None:
         cost = cost_of(totals, model)
         print(f"  cost   : ~${cost:.2f} ({model}); ~${cost/done:.3f} per act")
     print(f"  model  : {model}   database: {db_path}")
+
+
+def halt_if_wiped_out(result, label: str) -> None:
+    """Exit non-zero if every act failed — the signature of a dead API.
+
+    One act failing is normal: a malformed source file, an overlong act, a
+    transient overload. *Every* act failing is not a data problem, it is the API
+    refusing us — an exhausted credit balance, a revoked key, an outage. The two
+    need opposite responses, so they are told apart here rather than treated
+    alike: the first is a gap to backfill, the second must stop the pipeline
+    before it publishes a day that contains nothing.
+    """
+    written, failed = result
+    if failed and not written:
+        raise SystemExit(
+            f"ПОМИЛКА: жоден з {failed} {label} не витягнуто — API недоступний "
+            f"(вичерпаний баланс, відкликаний ключ або збій). Зупиняємо конвеєр."
+        )
 
 
 def totals_for(db_path, tables=("decisions", "rulings", "reviews")) -> dict:

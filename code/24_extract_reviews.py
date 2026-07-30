@@ -261,7 +261,7 @@ def main():
     # More retries than the SDK default: an 862-act run will meet a 429 or an
     # overloaded response eventually, and losing an act to one is pure waste.
     client = anthropic.Anthropic(api_key=api_key, max_retries=8)
-    extract_runner.run(
+    result = extract_runner.run(
         md_files, "reviews",
         lambda p: extract_file(client, p, stage_14, args.model),
         model=args.model, db_path=args.db, limit=args.limit,
@@ -269,6 +269,7 @@ def main():
         precheck=lambda p: None if reviews_a_decision(p) else
             'ВРП акт, але не переглядає рішення палати',
     )
+    extract_runner.halt_if_wiped_out(result, "рішень ВРП")
 
 
 if __name__ == "__main__":

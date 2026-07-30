@@ -18,6 +18,31 @@ Spending is fenced twice — `--new-since-days` restricts it to newly discovered
 acts, and `--limit` caps the count regardless. A normal night is two or three
 acts, well under a dollar; the ceiling is about $13.
 
+## When the API stops answering
+
+If **every** act in a run fails — an exhausted credit balance, a revoked key, an
+outage — the pipeline halts itself and writes `data/.halted`. Later runs refuse
+to start until that file is removed.
+
+It stops the scrape too, not just extraction, for two reasons. Scraping on would
+keep stamping acts «Вперше побачено» that the next working run could no longer
+see, because `--new-since-days` would have aged them out — a week of outage
+would become a permanent hole in the corpus. And because nothing runs after the
+halt, stage 32 never rewrites `docs/meta.json`, so the site's «Оновлено» date
+stays at the last day the data was genuinely current instead of advancing over
+empty days.
+
+One act failing is not a halt — that is a bad source file, not a dead API, and
+the run continues.
+
+```bash
+rm data/.halted && code/run_daily.sh
+```
+
+The extraction window widens automatically on resume to cover the whole outage,
+measured from `data/.last-success`, so acts that arrived while it was stopped
+are still picked up.
+
 ## Install
 
 ```bash

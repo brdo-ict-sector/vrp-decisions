@@ -35,6 +35,8 @@ PY="$BASE_DIR/venv/bin/python3"
 LOG_DIR="$BASE_DIR/data/logs"
 LOG_FILE="$LOG_DIR/daily-$(date +%F).log"
 LOCK_FILE="$BASE_DIR/data/.daily.lock"
+HALT_FILE="$BASE_DIR/data/.halted"
+LAST_OK_FILE="$BASE_DIR/data/.last-success"
 
 NEW_SINCE_DAYS="${NEW_SINCE_DAYS:-5}"
 EXTRACT_LIMIT="${EXTRACT_LIMIT:-40}"
@@ -64,6 +66,27 @@ echo "$(date -Is)  старт щоденного оновлення"
 
 cd "$BASE_DIR"
 
+# ── Halt check ──────────────────────────────────────────────────────────────
+# Stop *everything*, not just extraction. Scraping on without extracting would
+# keep stamping acts «Вперше побачено» that the next successful run can no
+# longer see: `--new-since-days` would have aged them out, so a week of outage
+# would become a permanent hole in the corpus. Freezing the whole pipeline
+# bounds the damage to the handful of acts already ingested when it stopped.
+#
+# Nothing after this point runs, which is also what keeps the site honest: the
+# «Оновлено» stamp is written by stage 32, so a pipeline that never reaches
+# stage 32 cannot advance the date. The badge stays at the last day the data
+# was really current — no separate guard needed.
+if [[ -f "$HALT_FILE" ]]; then
+    echo
+    echo "⛔ КОНВЕЄР ЗУПИНЕНО $(cat "$HALT_FILE")"
+    echo "   Сайт показує дані станом на день останнього успішного запуску."
+    echo "   Після усунення причини (найімовірніше — баланс API):"
+    echo "       rm $HALT_FILE"
+    echo "       code/run_daily.sh          # вікно розшириться автоматично"
+    exit 1
+fi
+
 echo; echo "── 00: реєстр ──────────────────────────────────────────────────"
 "$PY" code/11_scrape_register.py "$@"
 
@@ -88,10 +111,34 @@ elif [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
     echo; echo "── 03: ПОМИЛКА — ANTHROPIC_API_KEY не заданий, витягування пропущено"
     echo "   (перевірте $BASE_DIR/.env)"
 else
+    # Cover the gap since the last successful publication. Without this, resuming
+    # after a halt would extract only the last few days and silently skip every
+    # act that arrived during the outage.
+    if [[ -f "$LAST_OK_FILE" ]]; then
+        gap=$(( ( $(date +%s) - $(date -r "$LAST_OK_FILE" +%s) ) / 86400 + 2 ))
+        if (( gap > NEW_SINCE_DAYS )); then
+            echo; echo "   остання успішна публікація $((gap - 2)) дн. тому —"
+            echo "   розширюємо вікно з $NEW_SINCE_DAYS до $gap дн."
+            NEW_SINCE_DAYS=$gap
+        fi
+    fi
+
     echo; echo "── 03: витягування даних з нових актів (за $NEW_SINCE_DAYS дн., макс. $EXTRACT_LIMIT на тип) ──"
     for stage in 22_extract_rulings 24_extract_reviews 21_extract_decisions; do
         echo; echo "   · $stage"
-        "$PY" "code/$stage.py" --new-since-days "$NEW_SINCE_DAYS" --limit "$EXTRACT_LIMIT"
+        # A stage exits non-zero only when *every* act failed — the API is gone,
+        # not one act being awkward. Stop here: publishing now would advance the
+        # site's date over a day that produced nothing.
+        if ! "$PY" "code/$stage.py" --new-since-days "$NEW_SINCE_DAYS" --limit "$EXTRACT_LIMIT"; then
+            echo "$(date -Is) на етапі $stage" > "$HALT_FILE"
+            echo
+            echo "⛔ КОНВЕЄР ЗУПИНЕНО. Наступні запуски не збиратимуть нові акти,"
+            echo "   доки причину не усунуто — інакше вони накопичаться поза вікном"
+            echo "   витягування і будуть втрачені."
+            echo "   Дата на сайті залишається незмінною: етап 32 не виконувався."
+            echo "   Відновлення:  rm $HALT_FILE && code/run_daily.sh"
+            exit 1
+        fi
     done
 fi
 
@@ -146,6 +193,10 @@ else
         fi
     fi
 fi
+
+# Stamped only on a complete, successful run — it is what the next run measures
+# the gap from when widening its extraction window.
+touch "$LAST_OK_FILE"
 
 echo; echo "$(date -Is)  завершено успішно"
 
