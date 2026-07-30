@@ -1,5 +1,5 @@
 [Unit]
-Description=VRP register ingest (scrape HCJ acts, download, convert to Markdown)
+Description=VRP nightly cycle (scrape HCJ acts, extract new ones, export, publish)
 Documentation=file:/home/ubuntu/vrp-ai-sandbox/constitution/02_tech_stack.md
 After=network-online.target
 Wants=network-online.target
@@ -15,3 +15,10 @@ ExecStart=/home/ubuntu/vrp-ai-sandbox/code/run_daily.sh
 TimeoutStartSec=8h
 # Ingest is background work — never let it starve an interactive session.
 Nice=10
+# The publish step pushes to GitHub over HTTPS and reads the token from
+# ~/.git-credentials, so $HOME has to be the real one. systemd sets it from
+# User=, but stating it means a change to that line cannot break the push
+# silently.
+Environment=HOME=/home/ubuntu
+# ANTHROPIC_API_KEY is NOT set here on purpose: unit files under /etc are
+# world-readable. run_daily.sh sources it from the repo's .env (mode 600).

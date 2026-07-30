@@ -23,7 +23,9 @@ Usage:
 import argparse
 import json
 import sqlite3
+from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import openpyxl
 
@@ -36,6 +38,7 @@ SELECTED_XLSX = BASE_DIR / "data" / "register" / "hcj_acts_selected.xlsx"
 LINKS_XLSX = BASE_DIR / "data" / "reference" / "decisions to web-links.xlsx"
 DOCS_DIR = BASE_DIR / "docs"
 OUTPUT_JSON = DOCS_DIR / "decisions.json"
+KYIV = ZoneInfo("Europe/Kyiv")
 
 
 def load_register() -> dict[str, dict]:
@@ -258,10 +261,33 @@ def main():
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(decisions, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # ── Currency stamp ──────────────────────────────────────────────────────
+    # The site must be able to say how current it is, and the answer has to be
+    # stamped here rather than computed in the browser: a page that derives
+    # "yesterday" from the visitor's clock claims to be fresh on a day the
+    # pipeline never ran, which is the one thing this line exists to rule out.
+    #
+    # The ingest runs at 02:00 Kyiv and covers acts published up to the previous
+    # day, so the data is current as of the run date minus one.
+    now = datetime.now(KYIV)
+    meta = {
+        "updated": (now - timedelta(days=1)).strftime("%d.%m.%Y"),
+        "generated_at": now.isoformat(timespec="seconds"),
+        "decisions": len(decisions),
+        "rulings_attached": sum(1 for d in decisions if d["ruling"]),
+        "reviews_attached": sum(1 for d in decisions if d["review"]),
+        "rulings_extracted": len(rulings),
+        "reviews_extracted": len(reviews),
+    }
+    (args.output.parent / "meta.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+
     linked = sum(1 for d in decisions if d["url"])
     with_ruling = sum(1 for d in decisions if d["ruling"])
     with_review = sum(1 for d in decisions if d["review"])
     print(f"Exported {len(decisions)} decisions ({linked} with source links) → {args.output}")
+    print(f"  оновлено: {meta['updated']} → {args.output.parent / 'meta.json'}")
     # R8: silence is indistinguishable from a bug, so the joins are always counted.
     print(f"  ухвала attached: {with_ruling}/{len(decisions)}"
           f"   ВРП перегляд attached: {with_review}/{len(decisions)}")

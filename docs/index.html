@@ -47,6 +47,7 @@
       border-radius: 20px; padding: .25rem .85rem; font-size: .72rem;
       letter-spacing: .05em; text-transform: uppercase; margin-bottom: .8rem;
     }
+    .header-badge + .header-badge { margin-left: .4rem; }
     h1 {
       font-size: clamp(1.25rem, 3vw, 1.8rem); font-weight: 700;
       line-height: 1.25; max-width: 720px; margin: 0 auto .4rem;
@@ -290,6 +291,7 @@
 
 <header>
   <span class="header-badge">ВРП | BRDO</span>
+  <span class="header-badge" id="updatedBadge" hidden></span>
   <h1>ШІ-огляд практики дисциплінарних палат<br>Вищої ради правосуддя</h1>
   <p class="subtitle" id="subtitle">Щоденний автоматичний збір та обробка ухвал та рішень щодо
     притягнення суддів до дисциплінарної відповідальності для первинного аналізу практики ВРП
@@ -812,6 +814,21 @@
     ['filterJudge','filterCourt','filterGround','filterSanction','filterChamber'].forEach(id => $(id).value = '');
     applyFilters();
   });
+
+  // Currency stamp, written by stage 32 at export time. Deliberately not derived
+  // from the visitor's clock: a page that computes "yesterday" locally would keep
+  // claiming to be current long after the nightly job stopped running. If the
+  // file is missing the badge simply stays hidden — an absent date is honest,
+  // an invented one is not.
+  fetch('meta.json')
+    .then(r => r.ok ? r.json() : null)
+    .then(m => {
+      if (!m || !m.updated) return;
+      const b = $('updatedBadge');
+      b.textContent = `Оновлено ${m.updated}`;
+      b.hidden = false;
+    })
+    .catch(() => {});
 
   fetch('decisions.json')
     .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })

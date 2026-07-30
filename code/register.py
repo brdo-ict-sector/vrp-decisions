@@ -18,7 +18,7 @@ malformed date shows up as an act extracted late instead of an act silently
 missing.
 """
 
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 import openpyxl
@@ -29,6 +29,7 @@ FILE_COL = "Локальний файл"
 DATE_COL = "Дата прийняття"
 NUMBER_COL = "Номер"
 KIND_COL = "Вид документу"
+SEEN_COL = "Вперше побачено"
 
 _EPOCH = datetime.min  # unparseable dates sort last, they are not dropped
 
@@ -70,6 +71,34 @@ def stems(register_path: Path, keep) -> list[str]:
     kind that are not extracted yet".
     """
     return [stem_of(r) for r in records(register_path) if keep(r)]
+
+
+def seen_within(days: int):
+    """Predicate accepting acts the register first discovered in the last `days`.
+
+    This is what makes the nightly job safe to leave unattended. «Вперше
+    побачено» is stamped only for acts a scrape actually found for the first
+    time — seeded history carries an empty stamp on purpose (11_scrape_register
+    calls it "an honest change log"), and re-reading an act never re-stamps it.
+    So this selects last night's arrivals and *excludes the backlog*, which is
+    the difference between a nightly bill of cents and one of tens of dollars.
+
+    An act with no stamp is never "new". That is the safe direction to fail: a
+    missed act shows up as a gap on the site, where filtering the wrong way
+    would silently spend the corpus budget.
+    """
+    cutoff = datetime.combine(date.today() - timedelta(days=days), time.min)
+
+    def keep(record: dict) -> bool:
+        stamp = record.get(SEEN_COL)
+        return bool(stamp) and _as_date(stamp) >= cutoff
+
+    return keep
+
+
+def both(*predicates):
+    """A predicate accepting records that every one of `predicates` accepts."""
+    return lambda record: all(p(record) for p in predicates)
 
 
 def markdown_files(markdown_dir: Path, ordered_stems: list[str],

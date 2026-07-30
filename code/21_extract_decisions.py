@@ -211,6 +211,9 @@ def main():
     ap.add_argument("--only", nargs="+", metavar="STEM",
                     help="extract only these acts (e.g. 617_08.04.2026) — used to "
                          "backfill a whole case rather than a recent window")
+    ap.add_argument("--new-since-days", type=int, metavar="N",
+                    help="only acts the register first saw in the last N days — what "
+                         "the nightly job runs, so it never walks into the backlog")
     ap.add_argument("--workers", type=int, default=6,
                     help="concurrent API calls (default 6); lower it if you see 429s")
     ap.add_argument("--budget", type=float,
@@ -223,8 +226,10 @@ def main():
         raise SystemExit("ERROR: ANTHROPIC_API_KEY environment variable not set")
 
     stage_14 = load_stage_14()
+    keep = (register.both(is_decision, register.seen_within(args.new_since_days))
+            if args.new_since_days else is_decision)
     md_files = register.markdown_files(
-        args.markdown_dir, register.stems(args.register, is_decision), args.only
+        args.markdown_dir, register.stems(args.register, keep), args.only
     )
     print(f"Found {len(md_files)} рішень дисциплінарних палат in {args.markdown_dir}"
           f" (newest first)")
