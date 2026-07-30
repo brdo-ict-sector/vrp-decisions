@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ШІ-огляд практики ВРП — дисциплінарні палати</title>
+  <!-- Inline so the page makes no second request; without it every load logs a 404. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a56db'/%3E%3Ctext x='16' y='23' font-family='Segoe UI,sans-serif' font-size='19' font-weight='700' fill='%23fff' text-anchor='middle'%3E%D0%92%3C/text%3E%3C/svg%3E" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { overflow-x: hidden; }
@@ -49,6 +51,14 @@
       font-size: clamp(1.25rem, 3vw, 1.8rem); font-weight: 700;
       line-height: 1.25; max-width: 720px; margin: 0 auto .4rem;
     }
+    /* Left-aligned inside a centred column: five sentences of centred text is
+       a wall, and the eye loses the line start on every wrap. */
+    .subtitle {
+      max-width: 860px; margin: .7rem auto 0; text-align: left;
+      font-size: .84rem; line-height: 1.6; color: rgba(255,255,255,.87);
+    }
+    .subtitle a { color: #fff; text-decoration: underline; }
+    .subtitle-more { display: none; }
 
     /* ── Layout ── */
     .wrap { max-width: 1280px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
@@ -81,12 +91,12 @@
 
     .facet { margin-bottom: 1rem; }
     .facet-title { font-size: .82rem; font-weight: 600; margin-bottom: .4rem; }
-    .facet select {
+    .facet select, .facet input {
       width: 100%; padding: .45rem .6rem; border: 1.5px solid var(--border);
       border-radius: 8px; font-size: .85rem; background: var(--surface);
       color: var(--text); outline: none;
     }
-    .facet select:focus { border-color: var(--blue); }
+    .facet select:focus, .facet input:focus { border-color: var(--blue); }
     .reset-btn {
       width: 100%; padding: .5rem; margin-top: .25rem; border: 1px solid var(--border);
       border-radius: 8px; background: var(--bg); color: var(--muted);
@@ -124,7 +134,15 @@
     .card-subtitle { font-size: .9rem; font-weight: 600; color: #3a4a6b; margin-top: .15rem; }
     .card-meta { font-size: .82rem; color: var(--muted); margin-top: .2rem; }
     .stage-note { font-size: .8rem; color: var(--muted); margin-top: .3rem; font-style: italic; }
-    .card-essence { font-size: .88rem; color: #3a4a6b; margin-top: .5rem; line-height: 1.5; }
+    /* Clamped in the collapsed card so a card stays scannable and the tags below
+       it stay on screen. The full text is «Суть рішення» in the open body, so
+       nothing is lost by truncating here. */
+    .card-essence {
+      font-size: .88rem; color: #3a4a6b; margin-top: .5rem; line-height: 1.5;
+      display: -webkit-box; -webkit-box-orient: vertical;
+      -webkit-line-clamp: 4; overflow: hidden;
+    }
+    .card.open .card-essence { display: none; }
     .chev { color: var(--muted); flex-shrink: 0; transition: transform .15s; }
     .card.open .chev { transform: rotate(180deg); }
 
@@ -200,6 +218,24 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── Pagination ── */
+    .pager {
+      display: flex; justify-content: center; align-items: center;
+      gap: .35rem; flex-wrap: wrap; margin: 1.25rem 0 .25rem;
+    }
+    .pager button {
+      min-width: 2.3rem; padding: .45rem .6rem; border: 1px solid var(--border);
+      border-radius: 8px; background: var(--surface); color: var(--text);
+      font-size: .85rem; font-family: inherit; cursor: pointer;
+    }
+    .pager button:hover:not(:disabled) { background: var(--blue-lt); color: var(--blue); }
+    .pager button:disabled { opacity: .4; cursor: default; }
+    .pager button.active {
+      background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 700;
+    }
+    .pager .ellipsis { color: var(--muted); padding: 0 .15rem; }
+    .pager-info { text-align: center; font-size: .78rem; color: var(--muted); }
+
     footer { text-align: center; padding: 1.25rem 1rem 2rem; font-size: .78rem; color: var(--muted); }
 
     @media (max-width: 860px) {
@@ -223,6 +259,26 @@
       /* Pack the facets two-up to cut the panel's height when expanded */
       .filters-body .facet { margin-bottom: .7rem; }
       .stages { grid-template-columns: 1fr; }
+
+      header { padding: 1.2rem 1rem 1.1rem; }
+      /* Five sentences would push the results off a phone screen, so the
+         subtitle is clamped and opens on tap. */
+      .subtitle {
+        font-size: .8rem;
+        display: -webkit-box; -webkit-box-orient: vertical;
+        -webkit-line-clamp: 3; overflow: hidden;
+      }
+      .subtitle.expanded { display: block; -webkit-line-clamp: unset; overflow: visible; }
+      .subtitle-more {
+        display: inline-block; margin-top: .45rem; padding: .3rem .7rem;
+        background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3);
+        border-radius: 14px; color: #fff; font: inherit; font-size: .76rem;
+        cursor: pointer;
+      }
+      .card-head { padding: .85rem .9rem; }
+      .card-essence { -webkit-line-clamp: 3; }
+      /* 44px minimum touch target */
+      .pager button { min-width: 2.75rem; min-height: 2.75rem; padding: .55rem .7rem; }
     }
     @media (max-width: 860px) and (min-width: 460px) {
       .facets-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
@@ -235,6 +291,15 @@
 <header>
   <span class="header-badge">ВРП | BRDO</span>
   <h1>ШІ-огляд практики дисциплінарних палат<br>Вищої ради правосуддя</h1>
+  <p class="subtitle" id="subtitle">Щоденний автоматичний збір та обробка ухвал та рішень щодо
+    притягнення суддів до дисциплінарної відповідальності для первинного аналізу практики ВРП
+    з боку дисциплінарних інспекторів. Система фокусується на огляді рішень дисциплінарних
+    палат, але додає до відповідних карток інформацію з ухвал (по номеру скарги) та рішень
+    ВРП. Наразі опрацьовані всі рішення ДП з 03 листопада 2025 року. Поточна точність
+    витягування даних — 93% (можна далі підвищити за умови деталізації схеми витягування
+    даних). Проєкт повністю викладений на
+    <a href="https://github.com/brdo-ict-sector/vrp-decisions" target="_blank" rel="noopener">GitHub</a>.</p>
+  <button class="subtitle-more" id="subtitleMore" aria-expanded="false" aria-controls="subtitle">Детальніше</button>
 </header>
 
 <div class="wrap">
@@ -252,13 +317,17 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
-        <input type="search" id="searchInput" placeholder="Пошук за прямими збігами…" />
+        <input type="search" id="searchInput" placeholder="Пошук у тексті…" />
       </div>
 
       <div class="facets-grid">
       <div class="facet">
         <div class="facet-title">Суддя</div>
-        <select id="filterJudge"><option value="">Усі судді</option></select>
+        <!-- An input, not a select: 200+ judges are unusable in a dropdown, and
+             a native datalist gives typeahead on desktop and mobile alike. -->
+        <input type="search" id="filterJudge" list="judgeList" autocomplete="off"
+               placeholder="Усі судді — пошук" />
+        <datalist id="judgeList"></datalist>
       </div>
       <div class="facet">
         <div class="facet-title">Суд</div>
@@ -289,6 +358,8 @@
       <div id="results">
         <div class="loading"><div class="spinner"></div><br>Завантаження даних…</div>
       </div>
+      <nav class="pager" id="pager" aria-label="Сторінки"></nav>
+      <div class="pager-info" id="pagerInfo"></div>
     </main>
 
   </div>
@@ -356,13 +427,28 @@
 
   const chamberLabel = d => d.chamber ? d.chamber + ' ДП' : '';
 
-  function fillSelect(sel, values) {
-    values.sort((a,b)=>a.localeCompare(b,'uk'));
+  function fillSelect(sel, values, cmp) {
+    values.sort(cmp || ((a,b)=>a.localeCompare(b,'uk')));
     for (const v of values) {
       const o = document.createElement('option');
       o.value = v; o.textContent = v;
       sel.appendChild(o);
     }
+  }
+
+  // Підстави read as «106-1а …», «106-10 …». Alphabetically 106-10 sorts before
+  // 106-2, which puts the list in an order no lawyer reads the article in, so
+  // sort on the point as a number and the sub-point in Ukrainian alphabet order.
+  const UK_ALPHABET = 'абвгґдеєжзиіїйклмнопрстуфхцчшщьюя';
+  function groundKey(g) {
+    const m = /^106-(\d+)\s*([а-яґ]?)/i.exec(String(g).trim());
+    if (!m) return [999, 999, String(g)];
+    const letter = m[2] ? UK_ALPHABET.indexOf(m[2].toLowerCase()) : -1;
+    return [parseInt(m[1], 10), letter, String(g)];
+  }
+  function compareGrounds(a, b) {
+    const ka = groundKey(a), kb = groundKey(b);
+    return (ka[0] - kb[0]) || (ka[1] - kb[1]) || ka[2].localeCompare(kb[2], 'uk');
   }
 
   // Judges and courts come from every judge the act names, not just the first:
@@ -392,9 +478,11 @@
       if (d.chamber) chambers.add(d.chamber.trim());
       sanctions.add(sanctionKind(d));
     }
-    fillSelect($('filterJudge'), [...judges]);
+    // The judge facet is a datalist, so it takes bare <option>s with no
+    // placeholder row — fillSelect appends the same either way.
+    fillSelect($('judgeList'), [...judges]);
     fillSelect($('filterCourt'), [...courts]);
-    fillSelect($('filterGround'), [...grounds]);
+    fillSelect($('filterGround'), [...grounds], compareGrounds);
     fillSelect($('filterSanction'), [...sanctions]);
     fillSelect($('filterChamber'), [...chambers]);
   }
@@ -553,21 +641,22 @@
       ? `<a class="src-link" href="${esc(d.url)}" target="_blank" rel="noopener">↗ Джерело: ${esc(d.decision_num || d.filename)}</a>`
       : `<span class="src-link disabled">Джерело недоступне</span>`;
 
-    // Every judge and every court the act names — not just the first. An act
-    // that rules on four judges from two courts must not read as one judge from
-    // one court: that is the difference between «this case is about Печерський
-    // суд» and «this case is also about the ВАКС appeal chamber».
+    // The act, not the judge, heads the card: the decision number is what an
+    // inspector cites, and it is unique where a judge name is not.
+    //
+    // Every judge the act names is still listed — a co-defendant must not
+    // disappear — but the court is not: one act can rule on four judges from
+    // four courts, and four court names in a card header is a wall of text
+    // that pushes the substance below the fold. The court stays a filter.
     const names = judgesOf(d);
-    const courts = courtsOf(d);
-    const titleText = names.length ? names.join(', ') : (d.short_name || d.filename);
+    const titleText = d.decision_num ? '№ ' + d.decision_num : (d.short_name || d.filename);
     const countChip = names.length > 1
       ? `<span class="judge-count">${names.length} ${pluralJudges(names.length)}</span>` : '';
 
     const metaParts = [
+      names.length ? names.join(', ') : '',
       d.date,
       chamberLabel(d),
-      d.decision_num ? '№ ' + d.decision_num : '',
-      courts.join(' · '),
     ].filter(Boolean).map(esc).join(' · ');
 
     // A ВРП review is a separate act, not a stage of this one, so there is no
@@ -614,22 +703,79 @@
     if (card) card.classList.toggle('open');
   };
 
-  function render(list) {
+  // ── Pagination ──────────────────────────────────────────────────────────
+  const PAGE_SIZE = 30;
+  let FILTERED = [], PAGE = 1;
+
+  function render(list, page) {
+    FILTERED = list;
+    const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    PAGE = Math.min(Math.max(1, page || 1), pages);
+
     const box = $('results');
-    if (!list.length) { box.innerHTML = '<div class="empty">Рішень не знайдено</div>'; return; }
-    box.innerHTML = list.map((d) => cardHtml(d, ALL.indexOf(d))).join('');
+    if (!list.length) {
+      box.innerHTML = '<div class="empty">Рішень не знайдено</div>';
+      $('pager').innerHTML = ''; $('pagerInfo').textContent = '';
+      return;
+    }
+    const from = (PAGE - 1) * PAGE_SIZE;
+    const slice = list.slice(from, from + PAGE_SIZE);
+    // Index is into ALL, not into the page, so toggle() still finds the card
+    // after any filter or page change.
+    box.innerHTML = slice.map(d => cardHtml(d, ALL.indexOf(d))).join('');
+    renderPager(pages);
+    $('pagerInfo').textContent = pages > 1
+      ? `Показано ${from + 1}–${from + slice.length} з ${list.length}` : '';
   }
+
+  // 1 … 4 5 [6] 7 8 … 12 — a window around the current page, so the control
+  // stays one line wide on a phone however many pages there are.
+  function pageNumbers(pages, cur) {
+    const out = new Set([1, pages, cur, cur - 1, cur + 1]);
+    if (cur <= 3) { out.add(2); out.add(3); }
+    if (cur >= pages - 2) { out.add(pages - 1); out.add(pages - 2); }
+    return [...out].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
+  }
+
+  function renderPager(pages) {
+    const nav = $('pager');
+    if (pages <= 1) { nav.innerHTML = ''; return; }
+    let html = `<button type="button" data-page="${PAGE - 1}" ${PAGE === 1 ? 'disabled' : ''}
+                  aria-label="Попередня сторінка">‹</button>`;
+    let prev = 0;
+    for (const n of pageNumbers(pages, PAGE)) {
+      if (n - prev > 1) html += `<span class="ellipsis">…</span>`;
+      html += `<button type="button" data-page="${n}" class="${n === PAGE ? 'active' : ''}"
+                 ${n === PAGE ? 'aria-current="page"' : ''}>${n}</button>`;
+      prev = n;
+    }
+    html += `<button type="button" data-page="${PAGE + 1}" ${PAGE === pages ? 'disabled' : ''}
+               aria-label="Наступна сторінка">›</button>`;
+    nav.innerHTML = html;
+  }
+
+  $('pager').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-page]');
+    if (!btn || btn.disabled) return;
+    render(FILTERED, parseInt(btn.dataset.page, 10));
+    // Land at the top of the results, not wherever the old page's scroll left us.
+    document.querySelector('main').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 
   function applyFilters() {
     const q = $('searchInput').value.toLowerCase().trim();
-    const j = $('filterJudge').value;
+    const j = $('filterJudge').value.trim();
     const c = $('filterCourt').value;
     const g = $('filterGround').value;
     const s = $('filterSanction').value;
     const ch = $('filterChamber').value;
 
+    // The judge box is free text, so a partial name narrows rather than matching
+    // nothing — picking a full name from the datalist is the exact case of this.
+    const jq = j.toLowerCase();
+
     const filtered = ALL.filter(d => {
-      if (j && !judgesOf(d).some(x => x && x.trim() === j)) return false;
+      if (jq && !judgesOf(d).some(x => x && x.toLowerCase().includes(jq))) return false;
       if (c && !courtsOf(d).some(x => x && x.trim() === c)) return false;
       if (g && !(d.art106_grounds || []).some(x => x && x.trim() === g)) return false;
       if (s && sanctionKind(d) !== s) return false;
@@ -640,9 +786,11 @@
       }
       return true;
     });
-    render(filtered);
+    // Any change to the filters returns to page 1: staying on page 4 of a result
+    // set that now has two pages shows an empty screen that reads as "no matches".
+    render(filtered, 1);
     $('countBadge').textContent = filtered.length === ALL.length
-      ? `${ALL.length} рішень` : `Показано ${filtered.length} з ${ALL.length}`;
+      ? `${ALL.length} рішень` : `Знайдено ${filtered.length} з ${ALL.length}`;
   }
 
   ['searchInput','filterJudge','filterCourt','filterGround','filterSanction','filterChamber']
@@ -651,6 +799,12 @@
   $('filtersToggle').addEventListener('click', () => {
     const open = document.querySelector('.filters').classList.toggle('open');
     $('filtersToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  // Subtitle expander — the button only exists on narrow screens (CSS).
+  $('subtitleMore').addEventListener('click', () => {
+    const open = $('subtitle').classList.toggle('expanded');
+    $('subtitleMore').setAttribute('aria-expanded', open ? 'true' : 'false');
+    $('subtitleMore').textContent = open ? 'Згорнути' : 'Детальніше';
   });
 
   $('resetBtn').addEventListener('click', () => {
@@ -664,7 +818,7 @@
     .then(data => {
       ALL = data;
       buildFacets();
-      render(ALL);
+      render(ALL, 1);
       $('countBadge').textContent = `${ALL.length} рішень`;
     })
     .catch(err => {
