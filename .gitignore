@@ -1,4 +1,13 @@
-# Build inputs / large data — NOT served by the site, kept local only
+# Build inputs and the working database — kept local only.
+#
+# The register spreadsheets under data/register/ are the exception and are
+# committed with `git add -f`: they are small, and they are what a fresh clone
+# needs to know which acts exist without re-scraping the whole site.
+#
+# data/decisions.db is deliberately NOT tracked. It is a multi-megabyte binary
+# that changes every night and cannot be diffed or reviewed. The same records
+# live in dataset/ as JSON — readable, greppable, reviewable in a pull request,
+# and regenerated nightly. That is the off-host copy of the extraction work.
 data/
 
 # Python

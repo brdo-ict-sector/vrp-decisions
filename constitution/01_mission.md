@@ -1,6 +1,6 @@
 # Product Mission
 
-> Last updated: 2026-07-29
+> Last updated: 2026-07-30
 > Status: Active
 > Source: derived from [00_stakeholder_requirements.md](./00_stakeholder_requirements.md)
 > Downstream: [02_tech_stack.md](./02_tech_stack.md), [03_roadmap.md](./03_roadmap.md)
@@ -50,7 +50,7 @@ Producing the узагальнення requires experts to read long disciplinar
 manually draft the фабула, суть, and key conclusions, while also extracting structured
 facts (judge, court, qualification, conduct, sanction) for each decision — at every stage
 of the ДП→ВРП chain. This is a major drain on scarce expert time and does not scale to a corpus
-of 935 acts for 2025–2026 alone.
+of 940 acts for 2025–2026 alone.
 
 **Our Solution:** AI drafts the structured preprocessing for every decision according to a
 fixed schema; an expert then verifies and corrects it before it becomes authoritative.
@@ -129,8 +129,10 @@ The second instance, and its own act type:
   fully manual process.
 
 Scale: the MVP targeted ~30 decisions to validate the approach. The register has since defined
-the real corpus — **935 disciplinary acts for 2025–2026** (450 рішення + 485 ухвали про
-відкриття справи) — and earlier years are still to be backfilled.
+the real corpus — **940 disciplinary acts for 2025–2026** (329 рішення ДП + 125 рішення ВРП +
+486 ухвали про відкриття справи) — and earlier years are still to be backfilled. 415 of those
+acts are extracted and 165 рішення ДП are published; the daily cycle keeps the recent end
+current without anyone acting.
 
 ## Vision
 

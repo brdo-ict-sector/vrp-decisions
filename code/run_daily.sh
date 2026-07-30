@@ -101,6 +101,12 @@ fi
 echo; echo "── 04: експорт у docs/decisions.json ───────────────────────────"
 "$PY" code/32_export_to_json.py
 
+# The database itself is not in git — it is a binary that cannot be reviewed.
+# This is the readable, committed copy of the same records, and the only one
+# that exists off this host.
+echo; echo "── 04b: експорт набору даних у dataset/ ────────────────────────"
+"$PY" code/33_export_dataset.py
+
 # ── 05: публікація ──────────────────────────────────────────────────────────
 # GitHub Pages serves main:/docs, so a push is the deployment.
 if [[ "${SKIP_PUBLISH:-0}" == "1" ]]; then
@@ -115,7 +121,7 @@ else
     else
         # Only the generated artefacts. `git add -A` would sweep in whatever else
         # happens to be in the tree, which is not this job's to commit.
-        git -C "$BASE_DIR" add docs/decisions.json docs/meta.json
+        git -C "$BASE_DIR" add docs/decisions.json docs/meta.json dataset/
         git -C "$BASE_DIR" add -f data/register/hcj_acts.xlsx data/register/hcj_acts_selected.xlsx
 
         if git -C "$BASE_DIR" diff --cached --quiet; then

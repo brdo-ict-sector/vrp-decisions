@@ -1,6 +1,6 @@
 # Roadmap
 
-> Last updated: 2026-07-29
+> Last updated: 2026-07-30
 > Status: Active
 > Source: derived from [00_stakeholder_requirements.md](./00_stakeholder_requirements.md),
 > [01_mission.md](./01_mission.md), [02_tech_stack.md](./02_tech_stack.md), and
@@ -12,7 +12,7 @@ Two words were doing the same job in earlier drafts. From now on:
 
 - **Phase** — one of the three parts of the pipeline: **ingestion → extraction → merge**.
   Phases are permanent; they are what the code is organized by, and the stage number's first
-  digit names the phase (`11–14` ingestion, `21–23` extraction, `31–32` merge).
+  digit names the phase (`11–14` ingestion, `21–24` extraction, `31–33` merge and export).
 - **Milestone** — a unit of delivery (M1, M2, …). Milestones come and go; each one advances
   one or more phases and has explicit exit criteria.
 
@@ -20,18 +20,24 @@ Two words were doing the same job in earlier drafts. From now on:
 
 | Phase | Stages | What it produces | State |
 |-------|--------|------------------|-------|
-| **1 · Ingestion** | `11_scrape_register` → `12_select_and_download` → `13_transform_raw_to_md` → `14_extract_complaint_numbers` | Every disciplinary act as Markdown, plus its complaint number(s) in the register | ✅ **Operating.** Runs nightly, unattended. 935/935 acts converted. |
-| **2 · Extraction** | `21_extract_decisions` (ДП рішення), `22_extract_rulings` (ухвали), `24_extract_reviews` (ВРП перегляди) | One structured record per act in SQLite, against `DECISION_SCHEMA` / `RULING_SCHEMA` / `REVIEW_SCHEMA` | 🚧 **Recent half extracted.** 161/325 ДП рішення, 206/485 ухвали, 43/125 ВРП переглядів — 410 records, newest-first, for **\$46.86** of a \$50 budget (2026-07-29). Unbroken from the newest act back to **03.11.2025** (рішення), **05.11.2025** (ухвали), **23.12.2025** (ВРП). The remaining ~500 acts need roughly **\$56** more. |
-| **3 · Merge** | `31_merge_proceedings` *(not written)*, `32_export_to_json` | One record per **proceeding** — one judge × one complaint, with its ухвала, рішення and ВРП review attached | ⛔ **Not built.** `32` exports decision records only, flattening to a lead judge for the current UI. |
+| **1 · Ingestion** | `11_scrape_register` → `12_select_and_download` → `13_transform_raw_to_md` → `14_extract_complaint_numbers` | Every disciplinary act as Markdown, plus its complaint number(s) in the register | ✅ **Operating.** Runs nightly, unattended. 940/940 acts converted. |
+| **2 · Extraction** | `21_extract_decisions` (ДП рішення), `22_extract_rulings` (ухвали), `24_extract_reviews` (ВРП перегляди) | One structured record per act in SQLite, against `DECISION_SCHEMA` / `RULING_SCHEMA` / `REVIEW_SCHEMA` | 🚧 **Recent half extracted, and self-maintaining at the front.** 165/329 ДП рішення, 207/486 ухвали, 43/125 ВРП переглядів — 415 records. Unbroken from the newest act back to **03.11.2025** (рішення), **05.11.2025** (ухвали), **23.12.2025** (ВРП). New acts are now extracted the night they appear; the ~525 acts *behind* the front still need roughly **\$58**. |
+| **3 · Merge and export** | `31_merge_proceedings` *(not written)*, `32_export_to_json`, `33_export_dataset` | One record per **proceeding** — one judge × one complaint, with its ухвала, рішення and ВРП review attached | ⛔ **Merge not built.** `32` exports decision records with the related acts joined onto each, flattening to a lead judge for the current UI; `33` writes the reviewable JSON dataset. |
 
-Phase 1 is done and self-maintaining. Phase 2 is a money question, not an engineering one.
-Phase 3 is the remaining engineering work, and it is what makes the product answer the
-question the stakeholders actually asked — see [M5](#m5--proceedings-merge).
+Phase 1 is done and self-maintaining. Phase 2 now maintains its own front automatically and
+is a money question only for the backlog behind it. Phase 3 is the remaining engineering
+work, and it is what makes the product answer the question the stakeholders actually asked —
+see [M6](#m6--proceedings-merge).
 
 **Three act types, not two.** The act number states who issued it (`…/2дп/15-…` a palate,
-`…/0/15-…` the ВРП in review), and it partitions the corpus exactly: 485 ухвали + 325 ДП
-рішення + 125 ВРП рішення = 935. The ВРП reviews were previously extracted as if they were
+`…/0/15-…` the ВРП in review), and it partitions the corpus exactly: 486 ухвали + 329 ДП
+рішення + 125 ВРП рішення = 940. The ВРП reviews were previously extracted as if they were
 chamber decisions, which is why every «Перегляд від ВРП» field came back empty.
+
+**Coverage is a prefix, not a sample.** Within its window the extraction is a census: acts
+were taken newest-first, so nothing inside was skipped or chosen. What looks like holes in
+the ВРП reviews is 11 acts stage 24 declines before spending a call, because they review no
+palate decision at all.
 
 ## Milestones
 
@@ -73,10 +79,10 @@ Let the source define the corpus instead of a hand-assembled batch.
 
 **Outcome:** 935 acts for 2025–2026 (450 рішення + 485 ухвали) downloaded, converted, and keyed.
 
-### M4 · Extraction across the corpus 🚧 *(current)*
+### M4 · Extraction across the corpus 🚧 *(front done, backlog outstanding)*
 
-The corpus is ingested; the recent half is now extracted, and what stops the rest is credit
-rather than code.
+The corpus is ingested; the recent half is extracted and published, and the front now
+maintains itself nightly (M5). What stops the rest is credit rather than code.
 
 - [x] Ухвала schema verified on a hand-checked sample (6 acts, 2026-07-29) — the
       `requested → opened → rejected` split reproduces the narrowing correctly.
@@ -119,29 +125,66 @@ rather than code.
 - [x] **Art. 106 enum completed to all 25 підстав**, one conflated label split, one disambiguated,
       and 35 affected acts re-extracted — 17 mentions of 106-12 recovered from free text. See
       `02_tech_stack.md` → *The Art. 106 enum*.
-- [ ] Extract the remaining ~500 acts (roughly \$56 at the measured \$0.111/act, or 1.5× that
+- [ ] Extract the remaining ~525 acts (roughly \$58 at the measured \$0.111/act, or 1.5× that
       after Sonnet 5's introductory pricing ends **2026-08-31**).
 - [x] Cost controls: resumability (skip-if-done), per-row token+model accounting, a `--budget`
       ceiling, and a measured **\$0.111 per act** to forecast and check the invoice against.
-- [ ] Re-export and publish.
+- [x] Re-export and publish — **done 2026-07-30**. `docs/decisions.json` carries all 165 рішення
+      ДП (56 with their ухвала attached, 17 with a ВРП перегляд), replacing the round-2 sample
+      of 32. The 151 extracted ухвали with no decision inside the window are in `dataset/` but
+      have no card of their own: "a case was opened" is not yet an answer to anything.
 
 **Exit criteria:** every act in the register has a structured record or a logged error;
 `sanction_type` populated for every рішення; the published dataset covers the whole 2025–2026
-corpus rather than a 32-record sample.
+corpus rather than a 32-record sample. **The last of these is met**; the first two wait on the
+backlog.
 
 **Where a resumed run picks up.** `--limit N` means "the next N *not-yet-extracted* acts, newest
 first", so continuing needs no bookkeeping — the first gap in each type is `2189_22.10.2025`
 (рішення), `2322_05.11.2025` (ухвали), `2799_23.12.2025` (ВРП).
 
-**Site not yet updated.** Stage 32 has not been run against this data: `docs/decisions.json` and
-the published site still carry the round-2 sample of 32 records. Nothing of this corpus run is
-visible to a reader yet.
-
 **Known gap:** all three extract stages skip rows that already carry `data`, so a schema change
 does not reach already-extracted records — clear the affected rows before re-running. This is the
 same property that makes a long run resumable, so it is a trade-off rather than a defect.
 
-### M5 · Proceedings merge
+### M5 · The automated daily cycle ✅
+
+Close the loop. Ingest already ran unattended; extraction and publishing did not, on the
+grounds that extraction costs money per act and publishing put unverified drafts on a live
+site. Both objections expired once the corpus was extracted and published: what a night adds
+is no longer 500 acts but the two or three the ВРП issued that day.
+
+- [x] `run_daily.sh` extended from ingest-only to the whole cycle: scrape → extract new →
+      export → commit → push. GitHub Pages serves `main:/docs`, so the push *is* the deploy.
+- [x] **`--new-since-days` on all three extraction stages.** «Вперше побачено» is stamped only
+      for acts a scrape genuinely discovered — seeded history carries an empty stamp on
+      purpose — so the selector reaches last night's arrivals and cannot reach the backlog
+      behind them. An act with no stamp is never "new", which is the safe direction to fail:
+      a missed act is a visible gap, a wrong filter is an invoice.
+- [x] `--limit` caps the act count regardless of what the register says. Two fences, because
+      the failure mode being fenced against is monetary and silent.
+- [x] Extraction order reversed relative to the corpus run — ухвали → ВРП → рішення ДП — so a
+      decision published tonight already carries the opening act it links to.
+- [x] Export runs even when nothing was extracted: it refreshes the «Оновлено» stamp, and a
+      join can change when the act on the other end of it arrives.
+- [x] Publish step commits only generated artefacts, refuses to run off `main`, and rebases
+      once on a rejected push before failing loudly.
+- [x] `32_export_to_json.py` also writes `docs/meta.json`; the page renders «Оновлено
+      DD.MM.YYYY» from it. Stamped at export time, never computed in the browser — a page
+      deriving "yesterday" from the visitor's clock would claim to be current on a day the
+      pipeline never ran.
+- [x] `33_export_dataset.py` writes `dataset/` — the extracted records as reviewable JSON,
+      committed, unlike the binary database. It is the only off-host copy of work that cost
+      real money.
+- [x] Verified end to end by a manual run on 2026-07-30 that found 3 genuinely new acts,
+      extracted them, re-exported and published.
+
+**Exit criteria met:** a day's acts reach the live site with no human action.
+
+**Deliberately still manual:** extracting the pre-November-2025 backlog. That is a spending
+decision, and it belongs to a person.
+
+### M6 · Proceedings merge
 
 Turn three piles of acts into one story per **proceeding** — one judge × one complaint. This is
 phase 3, and it does not exist yet.
@@ -153,7 +196,7 @@ phase 3, and it does not exist yet.
 - [ ] Expose «по чому відкрилися vs по чому реально було притягнуто» — a ухвала's
       `grounds.opened` against its рішення's `qualification.dp`, **for that judge**.
 
-Measured over all 935 acts before building:
+Measured over the whole corpus (935 acts, as it stood on 2026-07-29) before building:
 
 | edge | key | coverage |
 |---|---|---|
@@ -175,7 +218,7 @@ multi-judge acts produce one proceeding per judge with that judge's own outcome;
 are visible as such rather than silently dropped; where a review exists, the sanction shown is
 the one in force after review.
 
-### M6 · Verification workflow & quality
+### M7 · Verification workflow & quality
 
 Make expert correction first-class and measure it, per the success metrics in the mission.
 
@@ -185,7 +228,7 @@ Make expert correction first-class and measure it, per the success metrics in th
 - [ ] Confidence / "needs review" flags on low-certainty AI fields, starting with the 43 acts
       that carry no complaint number.
 
-### M7 · Depth & breadth
+### M8 · Depth & breadth
 
 - [ ] Backfill years before 2025 (one-off `--full` scrape).
 - [ ] Trends & analytics: grounds, conduct, and sanctions over time.

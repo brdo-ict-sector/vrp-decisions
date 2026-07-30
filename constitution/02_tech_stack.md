@@ -1,6 +1,6 @@
 # Tech Stack
 
-> Last updated: 2026-07-29
+> Last updated: 2026-07-30
 > Status: Active
 > Source: derived from [00_stakeholder_requirements.md](./00_stakeholder_requirements.md) and [01_mission.md](./01_mission.md)
 > Downstream: [03_roadmap.md](./03_roadmap.md), [04_spec_proceedings.md](./04_spec_proceedings.md)
@@ -48,7 +48,7 @@ Turn each act into a structured record. Costs money per act; run by hand.
 | 24 | `24_extract_reviews.py` | Same for **рішення ВРП про перегляд** (125 acts) — the second-instance act type. |
 
 Each stage selects its own acts from the register by act number, and the three sets partition
-the corpus exactly: 485 + 325 + 125 = 935, no overlap.
+the corpus exactly: 486 + 329 + 125 = 940, no overlap.
 
 Every stage reads the register through `register.py` and works **newest act first**. The stages
 used to glob the Markdown directory and sort it, which sorts by act serial as a *string* — so
@@ -403,31 +403,70 @@ data/                         # git-ignored: build inputs & local artifacts
   reference/                  # round-2 leftovers: web-links, manual extractions
   logs/                       # one log per nightly run, kept 30 days
   decisions.db                # SQLite working store: decisions / rulings / reviews (phase 2)
+                              #   NOT in git — a binary that changes nightly and cannot be
+                              #   reviewed; dataset/ is the readable copy
+dataset/                      # committed: the extracted records as JSON (stage 33)
+  decisions.json rulings.json reviews.json
+  schemas/                    # the JSON Schema each was extracted against
+  manifest.json README.md     # both generated, so counts cannot drift
 docs/                         # published by GitHub Pages
   decisions.json              # dataset consumed by the site (stage 32)
+  meta.json                   # currency stamp rendered as «Оновлено …» (stage 32)
   index.html                  # the application
-code/                         # the pipeline scripts (1x ingestion, 2x extraction, 3x merge)
+code/                         # the pipeline scripts (1x ingestion, 2x extraction,
+                              #   3x merge and export)
                               #   + extraction_schema.py, act_numbers.py, register.py,
                               #     joins.py, compare_models.py, run_daily.sh
-deploy/                       # systemd unit + timer for the nightly ingest
+deploy/                       # systemd unit + timer for the nightly cycle
 constitution/                 # SDD documents (requirements, mission, this file, roadmap, specs)
 ```
 
-## Daily ingest
+## The nightly cycle
 
-`code/run_daily.sh` chains the ingestion phase — stages 11 → 12 → 13 → 14 — driven by a systemd timer
-(`deploy/vrp-ingest.timer`) at **02:00 Kyiv time**. The zone is named in the calendar spec,
-so the job does not drift when Ukraine changes clocks even though the host runs on UTC. A
-missed run (machine off) is caught up once at next boot, and `run_daily.sh` holds a `flock`
-so a long conversion is never overtaken by the next night's run. Output goes to the journal
-and to `data/logs/daily-YYYY-MM-DD.log`.
+`code/run_daily.sh` runs the **whole pipeline** — ingest (11 → 12 → 13 → 14), extract what is
+new (22 → 24 → 21), export (32, 33), then commit and push — driven by a systemd timer
+(`deploy/vrp-ingest.timer`) at **02:00 Kyiv time**. The zone is named in the calendar spec, so
+the job does not drift when Ukraine changes clocks even though the host runs on UTC. A missed
+run (machine off) is caught up once at next boot, and `run_daily.sh` holds a `flock` so a long
+conversion is never overtaken by the next night's run. Output goes to the journal and to
+`data/logs/daily-YYYY-MM-DD.log`.
 
-Extraction (phase 2) and merge/publish (phase 3) stay **outside** the nightly job on purpose:
-extraction costs money per act, and what it produces is an AI draft that an expert verifies
-before it may appear on the live site. Automating that would break the AI-drafts /
-human-verifies rule. Stage 14 must stay inside the nightly job, and after stage 12: stage 12
-rebuilds `hcj_acts_selected.xlsx` from scratch each run, so the complaint-number columns are
-lost and re-added nightly. It costs nothing — regex over local Markdown, no API.
+GitHub Pages serves `main:/docs`, so the push **is** the deployment. The publish step stages
+only generated artefacts, refuses to run on any branch but `main` — committing elsewhere would
+stop the site updating with no error anywhere — and on a rejected push rebases once before
+failing loudly.
+
+### Why an unattended job may now spend money
+
+Extraction used to sit outside the nightly run because it costs money per act and produces AI
+drafts. The first objection was about *volume*: with the corpus unextracted, an unattended run
+could have spent ~$58 in a night. That is no longer the shape of the work — the corpus front is
+extracted, so a night's new acts are two or three, about thirty cents.
+
+It is fenced twice all the same, because the failure being guarded against is monetary and
+silent:
+
+- **`--new-since-days N`** selects on «Вперше побачено», which stage 11 stamps only for acts a
+  scrape genuinely discovered; seeded history carries an empty stamp on purpose, and re-reading
+  an act never re-stamps it. An act with no stamp is never "new" — the safe direction to fail,
+  since a missed act is a visible gap while a wrong filter is an invoice.
+- **`--limit N`** caps the act count whatever the register says, so even a register rebuild that
+  re-stamped every row could not produce more than ~$13 of calls.
+
+The AI-drafts / human-verifies rule is **not** repealed by this. Every published record still
+carries its source link and the site still says the summaries are unverified drafts. What
+changed is that the draft now reaches the reader without a human relaying it — verification
+becomes a correction workflow (M7) rather than a publication gate.
+
+Extraction order is ухвали → ВРП → рішення ДП, the reverse of the corpus run: a decision
+published tonight should already carry the opening act it links to rather than acquiring it a
+night later.
+
+Stage 14 must stay inside the nightly job, and after stage 12: stage 12 rebuilds
+`hcj_acts_selected.xlsx` from scratch each run, so the complaint-number columns are lost and
+re-added nightly. It costs nothing — regex over local Markdown, no API.
+
+`SKIP_EXTRACT=1` and `SKIP_PUBLISH=1` turn the corresponding steps off for a manual run.
 
 ## What is deliberately *not* in the stack
 
