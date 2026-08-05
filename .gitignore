@@ -27,3 +27,6 @@ docs/*.manual-bak
 
 # OS / editor
 .DS_Store
+
+# exclude design files
+design_files/

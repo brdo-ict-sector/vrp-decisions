@@ -5,60 +5,80 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ШІ-огляд практики ВРП — дисциплінарні палати</title>
   <!-- Inline so the page makes no second request; without it every load logs a 404. -->
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231a56db'/%3E%3Ctext x='16' y='23' font-family='Segoe UI,sans-serif' font-size='19' font-weight='700' fill='%23fff' text-anchor='middle'%3E%D0%92%3C/text%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23005caa'/%3E%3Ctext x='16' y='23' font-family='Segoe UI,sans-serif' font-size='19' font-weight='700' fill='%23fff' text-anchor='middle'%3E%D0%92%3C/text%3E%3C/svg%3E" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { overflow-x: hidden; }
 
+    /* Palette sampled from vrp.gov.ua: one blue, one navy, one yellow accent,
+       flat white surfaces, square corners, no shadows. */
     :root {
-      --blue:    #1a56db;
-      --blue-lt: #e8f0fe;
-      --navy:    #0f2557;
-      --gold:    #d4a017;
-      --bg:      #f4f6fb;
+      --blue:    #005caa;
+      --blue-dk: #234161;
+      --blue-lt: #e8f1f8;
+      --blue-br: #bcd6ea;
+      --gold:    #ffe449;
+      --bg:      #f5f7fa;
       --surface: #ffffff;
-      --border:  #dce3f0;
-      --text:    #1e2a45;
-      --muted:   #6b7a99;
-      --green:   #1d8a4e;
-      --red:     #c0392b;
-      --radius:  10px;
-      --shadow:  0 2px 12px rgba(15,37,87,.08);
+      --border:  #cccccc;
+      --border-soft: #e2e6ec;
+      --text:    #1d1d1b;
+      --muted:   #6d727c;
+      --red:     #a02c1e;
+      --radius:  0;
+      --shadow:  none;
+      --font: 'PT Sans', 'Fira Sans', 'Open Sans', 'Segoe UI', Roboto,
+              system-ui, -apple-system, sans-serif;
     }
 
     body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: var(--bg);
+      font-family: var(--font);
+      background: var(--surface);
       color: var(--text);
       min-height: 100vh;
     }
 
+    /* ── Brand bar (Вища рада правосуддя) ── */
+    .brandbar { background: var(--blue); color: #fff; }
+    .brandbar-inner {
+      max-width: 1280px; margin: 0 auto; padding: .8rem 1rem;
+      display: flex; align-items: center; gap: .9rem;
+    }
+    .brand-logo { height: 46px; width: auto; display: block; flex-shrink: 0; }
+    .brand-name {
+      font-size: clamp(1.15rem, 2.8vw, 1.8rem); font-weight: 700;
+      line-height: 1.1; letter-spacing: -.005em;
+    }
+
     /* ── Header ── */
+    /* A white title block under the blue bar, left-aligned in the same column —
+       the arrangement every content page on vrp.gov.ua uses. */
     header {
-      background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
-      color: #fff;
-      padding: 1.8rem 1.5rem 1.6rem;
-      text-align: center;
-      box-shadow: 0 4px 20px rgba(15,37,87,.25);
+      background: var(--surface);
+      color: var(--text);
+      max-width: 1280px; margin: 0 auto;
+      padding: 1.5rem 1rem 1.1rem;
+      text-align: left;
+      box-shadow: none;
     }
     .header-badge {
       display: inline-flex; align-items: center; gap: .4rem;
-      background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
-      border-radius: 20px; padding: .25rem .85rem; font-size: .72rem;
-      letter-spacing: .05em; text-transform: uppercase; margin-bottom: .8rem;
+      background: var(--blue-lt); border: 1px solid var(--blue-br); color: var(--blue);
+      border-radius: 0; padding: .22rem .6rem; font-size: .7rem; font-weight: 700;
+      letter-spacing: .05em; text-transform: uppercase; margin-bottom: .7rem;
     }
-    .header-badge + .header-badge { margin-left: .4rem; }
+    .header-badge + .header-badge { margin-left: .35rem; }
     h1 {
-      font-size: clamp(1.25rem, 3vw, 1.8rem); font-weight: 700;
-      line-height: 1.25; max-width: 720px; margin: 0 auto .4rem;
+      font-size: clamp(1.45rem, 3.4vw, 2.05rem); font-weight: 700;
+      line-height: 1.2; max-width: none; margin: 0 0 .4rem; color: var(--text);
     }
-    /* Left-aligned inside a centred column: five sentences of centred text is
-       a wall, and the eye loses the line start on every wrap. */
+    /* Five sentences of centred text is a wall, and the eye loses the line
+       start on every wrap — so this column stays left-aligned and narrow. */
     .subtitle {
-      max-width: 860px; margin: .7rem auto 0; text-align: left;
-      font-size: .84rem; line-height: 1.6; color: rgba(255,255,255,.87);
+      max-width: 900px; margin: .7rem 0 0; text-align: left;
+      font-size: .88rem; line-height: 1.6; color: #3c3c3a;
     }
-    .subtitle a { color: #fff; text-decoration: underline; }
+    .subtitle a { color: var(--blue); text-decoration: underline; }
     .subtitle-more { display: none; }
 
     /* ── Layout ── */
@@ -69,12 +89,17 @@
     .filters {
       background: var(--surface); border: 1px solid var(--border);
       border-radius: var(--radius); box-shadow: var(--shadow);
-      padding: 1rem; align-self: start; position: sticky; top: 1rem;
+      padding: 0; align-self: start; position: sticky; top: 1rem;
       max-height: calc(100vh - 2rem); overflow-y: auto;
     }
+    .filters-body { padding: .9rem .85rem 1rem; }
+    /* Solid blue caption bar, the same treatment the act register on
+       vrp.gov.ua gives its table head. Negative margins pull it flush. */
     .filters h2 {
-      font-size: .8rem; text-transform: uppercase; letter-spacing: .06em;
-      color: var(--muted); margin-bottom: .75rem;
+      background: var(--blue); color: #fff;
+      margin: -.9rem -.85rem .9rem; padding: .55rem .85rem;
+      font-size: .78rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em;
     }
     /* Mobile-only collapse toggle (hidden on desktop) */
     .filters-toggle { display: none; }
@@ -84,27 +109,30 @@
       color: var(--muted); pointer-events: none;
     }
     #searchInput {
-      width: 100%; padding: .55rem .8rem .55rem 2.1rem;
-      border: 1.5px solid var(--border); border-radius: var(--radius);
-      font-size: .88rem; background: var(--surface); color: var(--text); outline: none;
+      width: 100%; padding: .5rem .8rem .5rem 2.1rem;
+      border: 1px solid var(--border); border-radius: 0;
+      font-family: inherit; font-size: .88rem;
+      background: var(--surface); color: var(--text); outline: none;
     }
     #searchInput:focus { border-color: var(--blue); }
 
     .facet { margin-bottom: 1rem; }
-    .facet-title { font-size: .82rem; font-weight: 600; margin-bottom: .4rem; }
+    .facet-title { font-size: .82rem; font-weight: 700; margin-bottom: .35rem; }
     .facet select, .facet input {
-      width: 100%; padding: .45rem .6rem; border: 1.5px solid var(--border);
-      border-radius: 8px; font-size: .85rem; background: var(--surface);
-      color: var(--text); outline: none;
+      width: 100%; padding: .42rem .55rem; border: 1px solid var(--border);
+      border-radius: 0; font-family: inherit; font-size: .85rem;
+      background: var(--surface); color: var(--text); outline: none;
     }
     .facet select:focus, .facet input:focus { border-color: var(--blue); }
     .date-range { display: flex; flex-direction: column; gap: .3rem; }
+    /* The dark «Очистити» button from the register's filter row. */
     .reset-btn {
-      width: 100%; padding: .5rem; margin-top: .25rem; border: 1px solid var(--border);
-      border-radius: 8px; background: var(--bg); color: var(--muted);
-      font-size: .82rem; cursor: pointer;
+      width: 100%; padding: .5rem; margin-top: .25rem;
+      border: 1px solid var(--blue-dk); border-radius: 0;
+      background: var(--blue-dk); color: #fff;
+      font-family: inherit; font-size: .82rem; font-weight: 600; cursor: pointer;
     }
-    .reset-btn:hover { background: var(--blue-lt); color: var(--blue); }
+    .reset-btn:hover { background: #16293d; border-color: #16293d; color: #fff; }
 
     /* ── Results ── */
     .results-head {
@@ -124,23 +152,25 @@
     }
     /* Let the text column shrink instead of being forced wide by long tags (flexbox min-width:auto trap) */
     .card-head > div { min-width: 0; }
-    .card-head:hover { background: var(--blue-lt); }
-    .card-title { font-size: 1.02rem; font-weight: 700; color: var(--navy); text-wrap: balance; }
+    .card-head:hover { background: #f2f7fb; }
+    /* Blue like every document title in the register — it reads as the link
+       into the act, which is what it is. */
+    .card-title { font-size: 1.02rem; font-weight: 700; color: var(--blue); text-wrap: balance; }
     /* Multiplicity should read at a glance, not require counting the names. */
     .judge-count {
       display: inline-block; margin-left: .45rem; vertical-align: .1em;
       font-size: .7rem; font-weight: 700; letter-spacing: .02em;
-      padding: .1rem .45rem; border-radius: 10px;
-      background: var(--blue-lt); color: var(--blue);
+      padding: .1rem .45rem; border-radius: 0;
+      background: var(--blue-lt); color: var(--blue); border: 1px solid var(--blue-br);
     }
-    .card-subtitle { font-size: .9rem; font-weight: 600; color: #3a4a6b; margin-top: .15rem; }
+    .card-subtitle { font-size: .9rem; font-weight: 600; color: var(--text); margin-top: .15rem; }
     .card-meta { font-size: .82rem; color: var(--muted); margin-top: .2rem; }
     .stage-note { font-size: .8rem; color: var(--muted); margin-top: .3rem; font-style: italic; }
     /* Clamped in the collapsed card so a card stays scannable and the tags below
        it stay on screen. The full text is «Суть рішення» in the open body, so
        nothing is lost by truncating here. */
     .card-essence {
-      font-size: .88rem; color: #3a4a6b; margin-top: .5rem; line-height: 1.5;
+      font-size: .88rem; color: #3c3c3a; margin-top: .5rem; line-height: 1.5;
       display: -webkit-box; -webkit-box-orient: vertical;
       -webkit-line-clamp: 4; overflow: hidden;
     }
@@ -150,12 +180,15 @@
 
     .tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }
     .tag {
-      font-size: .72rem; padding: .15rem .55rem; border-radius: 12px;
+      font-size: .72rem; padding: .12rem .5rem; border-radius: 0;
       background: var(--blue-lt); color: var(--blue); font-weight: 600;
+      border: 1px solid var(--blue-br);
       max-width: 100%; overflow-wrap: anywhere;
     }
-    .tag.sanction { background: #fdeeee; color: var(--red); }
-    .tag.stage    { background: #eaf6ef; color: var(--green); }
+    .tag.sanction { background: #fdecea; color: var(--red); border-color: #e8bcb4; }
+    /* Yellow is the site's one accent — it marks the chain of acts the same way
+       the «Онлайн трансляція» panel is marked out on vrp.gov.ua. */
+    .tag.stage    { background: #fffbe0; color: #6b5000; border-color: var(--gold); }
 
     /* ── Card body (expanded) ── */
     .card-body { display: none; padding: 0 1.1rem 1.1rem; border-top: 1px solid var(--border); }
@@ -164,7 +197,7 @@
     .field { margin-top: 1rem; }
     .field-label {
       font-size: .74rem; text-transform: uppercase; letter-spacing: .05em;
-      color: var(--muted); font-weight: 700; margin-bottom: .3rem;
+      color: var(--blue); font-weight: 700; margin-bottom: .3rem;
     }
     .field-val { font-size: .9rem; line-height: 1.55; color: var(--text); }
     .field-val ul { padding-left: 1.1rem; }
@@ -172,32 +205,32 @@
 
     .stages { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .6rem; margin-top: .3rem; }
     .stage-col {
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: 8px; padding: .55rem .65rem;
+      background: var(--bg); border: 1px solid var(--border-soft);
+      border-radius: 0; padding: .55rem .65rem;
     }
     .stage-name {
-      font-size: .72rem; font-weight: 700; color: var(--navy);
+      font-size: .72rem; font-weight: 700; color: var(--text);
       text-transform: uppercase; letter-spacing: .03em; margin-bottom: .25rem;
     }
-    .stage-val { font-size: .84rem; line-height: 1.45; color: #3a4a6b; }
+    .stage-val { font-size: .84rem; line-height: 1.45; color: #3c3c3a; }
     .stage-val.empty { color: var(--muted); font-style: italic; }
 
     /* ── Related acts (ухвала / ВРП перегляд) ──
        Tinted and rule-marked so a reader can see at a glance which text is this
        act's and which was carried in from another act in the same case. */
     .related {
-      margin-top: 1rem; padding: .75rem .85rem; border-radius: 8px;
-      border: 1px solid var(--border); background: var(--bg);
+      margin-top: 1rem; padding: .75rem .85rem; border-radius: 0;
+      border: 1px solid var(--border-soft); background: var(--bg);
     }
-    .related-ruling { border-left: 3px solid var(--gold); }
-    .related-review { border-left: 3px solid var(--green); }
+    .related-ruling { border: 1px solid var(--gold); border-left-width: 4px; background: #fffdf2; }
+    .related-review { border: 1px solid var(--blue-br); border-left: 4px solid var(--blue); background: #f6fafd; }
     .related-head {
       display: flex; justify-content: space-between; align-items: baseline;
       gap: .6rem; flex-wrap: wrap;
     }
     .related-label {
       font-size: .74rem; text-transform: uppercase; letter-spacing: .05em;
-      font-weight: 700; color: var(--navy);
+      font-weight: 700; color: var(--text);
     }
     .related-meta { font-size: .8rem; color: var(--muted); }
     .related-meta a { color: var(--blue); font-weight: 600; text-decoration: none; }
@@ -227,7 +260,7 @@
     }
     .pager button {
       min-width: 2.3rem; padding: .45rem .6rem; border: 1px solid var(--border);
-      border-radius: 8px; background: var(--surface); color: var(--text);
+      border-radius: 0; background: var(--surface); color: var(--text);
       font-size: .85rem; font-family: inherit; cursor: pointer;
     }
     .pager button:hover:not(:disabled) { background: var(--blue-lt); color: var(--blue); }
@@ -238,31 +271,38 @@
     .pager .ellipsis { color: var(--muted); padding: 0 .15rem; }
     .pager-info { text-align: center; font-size: .78rem; color: var(--muted); }
 
-    footer { text-align: center; padding: 1.25rem 1rem 2rem; font-size: .78rem; color: var(--muted); }
+    /* A solid blue band closes the page against the brand bar that opens it. */
+    footer {
+      background: var(--blue); color: rgba(255,255,255,.92);
+      text-align: center; padding: 1.1rem 1rem; font-size: .8rem;
+    }
 
     @media (max-width: 860px) {
       .layout { grid-template-columns: 1fr; }
       .filters {
         position: static; max-height: none; overflow: visible;
-        padding: .35rem; margin-bottom: .25rem;
+        padding: 0; margin-bottom: .25rem;
       }
       .filters h2 { display: none; }            /* label lives in the toggle on mobile */
       .filters-toggle {
         display: flex; align-items: center; justify-content: space-between;
-        width: 100%; padding: .7rem .85rem; border: none; background: none;
-        font-size: .9rem; font-weight: 700; color: var(--navy);
+        width: 100%; padding: .7rem .85rem; border: none;
+        background: var(--blue); color: #fff; font-family: inherit;
+        font-size: .88rem; font-weight: 700;
         text-transform: uppercase; letter-spacing: .04em; cursor: pointer;
       }
       .filters-toggle .chev { transition: transform .2s; }
       .filters.open .filters-toggle .chev { transform: rotate(180deg); }
       /* Collapsed by default on mobile so results are visible immediately */
-      .filters-body { display: none; padding: 0 .5rem .5rem; }
+      .filters-body { display: none; padding: .75rem .7rem .8rem; }
       .filters.open .filters-body { display: block; }
       /* Pack the facets two-up to cut the panel's height when expanded */
       .filters-body .facet { margin-bottom: .7rem; }
       .stages { grid-template-columns: 1fr; }
 
-      header { padding: 1.2rem 1rem 1.1rem; }
+      .brandbar-inner { padding: .6rem .8rem; gap: .6rem; }
+      .brand-logo { height: 34px; }
+      header { padding: 1.2rem 1rem 1rem; }
       /* Five sentences would push the results off a phone screen, so the
          subtitle is clamped and opens on tap. */
       .subtitle {
@@ -273,9 +313,9 @@
       .subtitle.expanded { display: block; -webkit-line-clamp: unset; overflow: visible; }
       .subtitle-more {
         display: inline-block; margin-top: .45rem; padding: .3rem .7rem;
-        background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3);
-        border-radius: 14px; color: #fff; font: inherit; font-size: .76rem;
-        cursor: pointer;
+        background: var(--blue-lt); border: 1px solid var(--blue-br);
+        border-radius: 0; color: var(--blue); font: inherit; font-size: .76rem;
+        font-weight: 600; cursor: pointer;
       }
       .card-head { padding: .85rem .9rem; }
       .card-essence { -webkit-line-clamp: 3; }
@@ -289,6 +329,16 @@
   </style>
 </head>
 <body>
+
+<!-- Logo inlined for the same reason as the favicon: the page then needs no
+     second request and cannot render brandless if an asset 404s. -->
+<div class="brandbar">
+  <div class="brandbar-inner">
+    <img class="brand-logo" alt="Герб Вищої ради правосуддя"
+         src="data:image/png;base64,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" />
+    <span class="brand-name">Вища рада правосуддя</span>
+  </div>
+</div>
 
 <header>
   <span class="header-badge">ВРП | BRDO</span>
@@ -904,7 +954,7 @@
     })
     .catch(err => {
       $('results').innerHTML =
-        `<div class="empty" style="color:#c0392b">Помилка завантаження даних: ${esc(err.message)}<br>
+        `<div class="empty" style="color:var(--red)">Помилка завантаження даних: ${esc(err.message)}<br>
          <small>Переконайтесь, що файл decisions.json знаходиться поруч із index.html.</small></div>`;
     });
 </script>
