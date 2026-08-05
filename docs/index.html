@@ -42,12 +42,18 @@
     .brandbar { background: var(--blue); color: #fff; }
     .brandbar-inner {
       max-width: 1280px; margin: 0 auto; padding: .8rem 1rem;
-      display: flex; align-items: center; gap: .9rem;
+      display: flex; align-items: center; gap: .9rem; flex-wrap: wrap;
     }
     .brand-logo { height: 46px; width: auto; display: block; flex-shrink: 0; }
     .brand-name {
       font-size: clamp(1.15rem, 2.8vw, 1.8rem); font-weight: 700;
       line-height: 1.1; letter-spacing: -.005em;
+    }
+    /* Sits where the site's own utility links sit — far right of the blue bar,
+       small and white, so the currency stamp reads as chrome, not as content. */
+    .brand-updated {
+      margin-left: auto; font-size: .76rem; letter-spacing: .04em;
+      text-transform: uppercase; color: rgba(255,255,255,.88); white-space: nowrap;
     }
 
     /* ── Header ── */
@@ -61,21 +67,14 @@
       text-align: left;
       box-shadow: none;
     }
-    .header-badge {
-      display: inline-flex; align-items: center; gap: .4rem;
-      background: var(--blue-lt); border: 1px solid var(--blue-br); color: var(--blue);
-      border-radius: 0; padding: .22rem .6rem; font-size: .7rem; font-weight: 700;
-      letter-spacing: .05em; text-transform: uppercase; margin-bottom: .7rem;
-    }
-    .header-badge + .header-badge { margin-left: .35rem; }
     h1 {
       font-size: clamp(1.45rem, 3.4vw, 2.05rem); font-weight: 700;
       line-height: 1.2; max-width: none; margin: 0 0 .4rem; color: var(--text);
     }
-    /* Five sentences of centred text is a wall, and the eye loses the line
-       start on every wrap — so this column stays left-aligned and narrow. */
+    /* Left-aligned across the full content column: five sentences of centred
+       text is a wall, and the eye loses the line start on every wrap. */
     .subtitle {
-      max-width: 900px; margin: .7rem 0 0; text-align: left;
+      max-width: none; margin: .7rem 0 0; text-align: left;
       font-size: .88rem; line-height: 1.6; color: #3c3c3a;
     }
     .subtitle a { color: var(--blue); text-decoration: underline; }
@@ -302,6 +301,9 @@
 
       .brandbar-inner { padding: .6rem .8rem; gap: .6rem; }
       .brand-logo { height: 34px; }
+      /* Too narrow to sit beside the wordmark — it wraps to its own line,
+         still hard right, rather than crushing the name. */
+      .brand-updated { font-size: .68rem; margin-top: .3rem; }
       header { padding: 1.2rem 1rem 1rem; }
       /* Five sentences would push the results off a phone screen, so the
          subtitle is clamped and opens on tap. */
@@ -337,12 +339,11 @@
     <img class="brand-logo" alt="Герб Вищої ради правосуддя"
          src="data:image/png;base64,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" />
     <span class="brand-name">Вища рада правосуддя</span>
+    <span class="brand-updated" id="updatedBadge" hidden></span>
   </div>
 </div>
 
 <header>
-  <span class="header-badge">ВРП | BRDO</span>
-  <span class="header-badge" id="updatedBadge" hidden></span>
   <h1>ШІ-огляд практики дисциплінарних палат<br>Вищої ради правосуддя</h1>
   <p class="subtitle" id="subtitle">Щоденний автоматичний збір та обробка ухвал та рішень щодо
     притягнення суддів до дисциплінарної відповідальності для первинного аналізу практики ВРП
