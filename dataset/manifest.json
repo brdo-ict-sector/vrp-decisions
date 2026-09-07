@@ -1,12 +1,12 @@
 {
-  "exported_at": "2026-09-06T23:03:45+00:00",
+  "exported_at": "2026-09-07T23:05:50+00:00",
   "source_db": "/home/ubuntu/vrp-ai-sandbox/data/decisions.db",
   "tables": {
     "decisions": {
       "act_type": "Рішення Дисциплінарної палати",
       "json": "decisions.json",
       "schema": "schemas/extraction_schema.json",
-      "records": 186,
+      "records": 188,
       "errors": 0,
       "error_rows": []
     },
@@ -14,7 +14,7 @@
       "act_type": "Ухвала про відкриття дисциплінарної справи",
       "json": "rulings.json",
       "schema": "schemas/ruling_schema.json",
-      "records": 231,
+      "records": 235,
       "errors": 0,
       "error_rows": []
     },
