@@ -1,12 +1,12 @@
 {
-  "exported_at": "2026-10-06T23:05:01+00:00",
+  "exported_at": "2026-10-07T23:06:37+00:00",
   "source_db": "/home/ubuntu/vrp-ai-sandbox/data/decisions.db",
   "tables": {
     "decisions": {
       "act_type": "Рішення Дисциплінарної палати",
       "json": "decisions.json",
       "schema": "schemas/extraction_schema.json",
-      "records": 199,
+      "records": 201,
       "errors": 0,
       "error_rows": []
     },
