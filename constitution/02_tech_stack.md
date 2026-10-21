@@ -227,7 +227,9 @@ converted **once**: a file already downloaded, or already converted to Markdown,
 
 ### AI extraction & summarization
 - **Anthropic Claude API** via the official `anthropic` Python SDK.
-- **Model:** `claude-sonnet-5` on every extraction stage, with adaptive thinking. The system
+- **Model:** `claude-sonnet-5-5` on every extraction stage (since 2026-10-21; before that
+  `claude-sonnet-5`, which every record up to then was extracted with — each row stores its
+  model in `usage`), with adaptive thinking. The system
   prompt fixes the role (Ukrainian judicial-discipline analyst). `MAX_TOKENS` is 16000
   throughout — it caps thinking *and* response together, and the per-judge arrays make the
   response longer than the single-judge schema did.

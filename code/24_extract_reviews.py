@@ -56,8 +56,10 @@ MARKDOWN_DIR = BASE_DIR / "data" / "acts" / "md"
 REGISTER_PATH = BASE_DIR / "data" / "register" / "hcj_acts_selected.xlsx"
 DB_PATH = BASE_DIR / "data" / "decisions.db"
 
-MODEL = "claude-sonnet-5"  # A/B tested against Opus 5 on 20 acts: 96.6% agreement on
-                          # structured fields, no judge-identity differences, ~40% cheaper.
+MODEL = "claude-sonnet-5-5"  # successor to claude-sonnet-5 at the same $2/$10 (since
+                            # 2026-10-21). The A/B against Opus 5 ran on Sonnet 5: 96.6%
+                            # agreement on structured fields, no judge-identity differences,
+                            # ~40% cheaper.
 MAX_TOKENS = 16000
 MAX_CHARS = 500_000  # the whole act: the largest in the corpus is ~430k chars
 

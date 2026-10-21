@@ -37,7 +37,9 @@ from pathlib import Path
 # for the `--budget` ceiling — the invoice is authoritative, this is what we
 # steer by. Sonnet 5 is at introductory pricing ($2/$10) through 2026-08-31;
 # list is $3/$15, so a run that straddles that date costs 1.5× this estimate.
+# Sonnet 5.5, the extraction model since 2026-10-21, is priced the same.
 PRICES = {
+    "claude-sonnet-5-5": (2.00, 10.00),
     "claude-sonnet-5": (2.00, 10.00),
     "claude-opus-5": (5.00, 25.00),
     "claude-haiku-4-5": (1.00, 5.00),

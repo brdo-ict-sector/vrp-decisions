@@ -102,6 +102,8 @@ maintains itself nightly (M5). What stops the rest is credit rather than code.
 - [x] Reconcile the model pinned by each extraction stage — all three now run `claude-sonnet-5`
       at `MAX_TOKENS` 16000, chosen over `claude-opus-5` on a 20-act A/B (140/145 fields agree,
       identical judge identification, ~40% cheaper). See `02_tech_stack.md` → Why Sonnet.
+- [x] Move every extraction stage to `claude-sonnet-5-5` (2026-10-21) — Sonnet 5's successor at
+      the same \$2/\$10. Already-extracted acts are not redone; new acts use the new model.
 - [x] Order extraction newest-act-first (`register.py`); add `--only` to backfill whole cases.
 - [x] Stop clipping act text (`MAX_CHARS` 500 000) — the old 160 000 tail-clip removed the
       operative part, and with it the sanction, on the 30 longest acts.
