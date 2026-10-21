@@ -180,6 +180,11 @@ is no longer 500 acts but the two or three the ВРП issued that day.
       real money.
 - [x] Verified end to end by a manual run on 2026-07-30 that found 3 genuinely new acts,
       extracted them, re-exported and published.
+- [x] **Halt-and-resume proven in production.** The credit balance ran out on 2026-10-13; the
+      pipeline halted itself and froze the site's date. It was resumed on 2026-10-21 by
+      clearing `data/.halted`. The window widened from 5 to 10 days and 20 acts were
+      backfilled, with nothing lost. Procedure and pitfalls: `deploy/README.md` → *When the API stops
+      answering*.
 
 **Exit criteria met:** a day's acts reach the live site with no human action.
 

@@ -85,12 +85,16 @@ a dollar.
 
 | | |
 |---|---|
-| **Corpus ingested** | 937 acts for 2025–2026 — 485 ухвали, 327 рішення ДП, 125 рішення ВРП |
-| **Extracted** | 163 рішення ДП · 206 ухвали · 43 рішення ВРП |
-| **Published** | all 163 рішення ДП, 55 with their opening ruling attached, 17 with a VRP review |
+| **Corpus ingested** | 1 069 acts for 2025–2026 — 539 ухвали, 378 рішення ДП, 152 рішення ВРП |
+| **Extracted** | 215 рішення ДП · 265 ухвали · 60 рішення ВРП |
+| **Published** | all 215 рішення ДП, 90 with their opening ruling attached, 26 with a VRP review |
 | **Coverage** | complete from **03.11.2025** onward for рішення ДП, 05.11.2025 for ухвали, 23.12.2025 for ВРП reviews |
-| **Automation** | full cycle nightly, unattended |
-| **Cost** | ~$0.11 per act; the corpus so far cost about $47 |
+| **Automation** | full cycle nightly, unattended; halts itself if the API stops answering |
+| **Model** | `claude-sonnet-5-5` since 21.10.2026; every earlier record was extracted with `claude-sonnet-5` |
+| **Cost** | ~$0.11 per act; the corpus so far cost about $61 |
+
+*Figures as of 21.10.2026. The site's own «Оновлено» stamp (`docs/meta.json`) is
+always current; this table is updated by hand.*
 
 Extraction is a **complete sweep back to a cut-off date, not a sample** — nothing
 inside the covered window was skipped or cherry-picked. Roughly half the corpus
@@ -99,7 +103,7 @@ question rather than an engineering one.
 
 Because an opening ruling and the decision that closes the case are typically
 6–18 months apart, a window reaching back to late 2025 contains relatively few
-complete pairs. 151 extracted ухвали have no decision inside the window and so
+complete pairs. 178 extracted ухвали have no decision inside the window and so
 appear in the dataset but not on the site.
 
 The merge phase (one record per *proceeding* — one judge × one complaint) is

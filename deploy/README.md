@@ -43,6 +43,34 @@ The extraction window widens automatically on resume to cover the whole outage,
 measured from `data/.last-success`, so acts that arrived while it was stopped
 are still picked up.
 
+**Do not resume with `SKIP_EXTRACT=1`.** A run that skips extraction still
+finishes "successfully" and touches `data/.last-success`, so the next run
+measures the gap from *that* run instead of from the outage. The acts stamped
+during the outage then fall outside `--new-since-days` and are never extracted.
+Fix the API first, then resume with a full run.
+
+The first real halt happened on 13.10.2026: the credit balance ran out
+(`400 … Your credit balance is too low`) partway through stage 21. It was
+resumed on 21.10.2026. The window widened from 5 to 10 days on its own and
+20 acts were extracted (about $2.80). These included 3 of the 4 decisions that
+had failed on the 13th; the fourth is now listed in the register as an ухвала
+and was extracted as one. Nothing was lost, and the site's date stayed at 12.10
+until then.
+
+### Replacing the API key
+
+A credit error means the *organisation* has no balance, not that the key is
+bad. A new key in an organisation with no credit fails the same way.
+
+1. Test the new key before installing it: one tiny request with the pipeline's
+   model, run on the host. Send the key over stdin or from a file, never as a
+   command-line argument, which other users can see in the process list.
+2. Write `ANTHROPIC_API_KEY=…` to `.env` and keep it at mode 600.
+3. Don't leave copies of the old file behind. `data/` is not in git, but it is
+   still on disk and goes wherever `data/` is copied.
+4. If the pipeline halted: `rm data/.halted && sudo systemctl start vrp-ingest.service`,
+   then follow `journalctl -u vrp-ingest.service -f`.
+
 ## Install
 
 ```bash
