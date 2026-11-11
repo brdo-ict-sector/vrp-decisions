@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-11-10T00:05:35+00:00",
+  "exported_at": "2026-11-11T00:02:40+00:00",
   "source_db": "/home/ubuntu/vrp-ai-sandbox/data/decisions.db",
   "tables": {
     "decisions": {
@@ -27,7 +27,7 @@
       "act_type": "Рішення ВРП за скаргою на рішення ДП",
       "json": "reviews.json",
       "schema": "schemas/review_schema.json",
-      "records": 60,
+      "records": 63,
       "errors": 0,
       "error_rows": []
     }
