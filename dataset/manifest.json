@@ -1,12 +1,12 @@
 {
-  "exported_at": "2026-11-19T00:05:36+00:00",
+  "exported_at": "2026-11-20T00:05:31+00:00",
   "source_db": "/home/ubuntu/vrp-ai-sandbox/data/decisions.db",
   "tables": {
     "decisions": {
       "act_type": "Рішення Дисциплінарної палати",
       "json": "decisions.json",
       "schema": "schemas/extraction_schema.json",
-      "records": 227,
+      "records": 230,
       "errors": 1,
       "error_rows": [
         {
@@ -19,7 +19,7 @@
       "act_type": "Ухвала про відкриття дисциплінарної справи",
       "json": "rulings.json",
       "schema": "schemas/ruling_schema.json",
-      "records": 285,
+      "records": 286,
       "errors": 0,
       "error_rows": []
     },
@@ -27,7 +27,7 @@
       "act_type": "Рішення ВРП за скаргою на рішення ДП",
       "json": "reviews.json",
       "schema": "schemas/review_schema.json",
-      "records": 64,
+      "records": 65,
       "errors": 0,
       "error_rows": []
     }
